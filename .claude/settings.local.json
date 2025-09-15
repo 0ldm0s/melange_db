@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/0ldm0s/workspaces/rust/**)",
+      "Bash(cargo check)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
