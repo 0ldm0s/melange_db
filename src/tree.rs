@@ -20,6 +20,9 @@ use parking_lot::{
 
 use crate::*;
 
+// 使用性能优化的日志宏
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
+
 #[cfg(feature = "for-internal-testing-only")]
 use crate::block_checker::track_blocks;
 
@@ -35,7 +38,7 @@ impl<const LEAF_FANOUT: usize> Drop for Tree<LEAF_FANOUT> {
     fn drop(&mut self) {
         if self.cache.config.flush_every_ms.is_none() {
             if let Err(e) = self.flush() {
-                log::error!("failed to flush Db on Drop: {e:?}");
+                error_log!("failed to flush Db on Drop: {e:?}");
             }
         } else {
             // otherwise, it is expected that the flusher thread will
@@ -97,7 +100,7 @@ impl<const LEAF_FANOUT: usize> Drop for LeafReadGuard<'_, LEAF_FANOUT> {
             current_epoch,
         ) {
             self.inner.set_error(&e);
-            log::error!(
+            error_log!(
                 "io error while paging out dirty data: {:?} \
                 for guard of leaf with low key {:?}",
                 e,
@@ -154,7 +157,7 @@ impl<const LEAF_FANOUT: usize> Drop for LeafWriteGuard<'_, LEAF_FANOUT> {
             self.epoch(),
         ) {
             self.inner.set_error(&e);
-            log::error!("io error while paging out dirty data: {:?}", e);
+            error_log!("io error while paging out dirty data: {:?}", e);
         }
     }
 }
@@ -222,7 +225,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             loops += 1;
 
             if loops > 10_000_000 && !warned {
-                log::warn!(
+                warn_log!(
                     "page_in spinning for a long time due to continue point {}",
                     last_continue
                 );
@@ -241,7 +244,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
 
             let (low_key, node) = self.index.get_lte(key).unwrap();
             if node.collection_id != self.collection_id {
-                log::trace!("retry due to mismatched collection id in page_in");
+                trace_log!("retry due to mismatched collection id in page_in");
 
                 hint::spin_loop();
 
@@ -294,7 +297,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 if leaf.lo != low_key {
                     // TODO determine why this rare situation occurs and better
                     // understand whether it is really benign.
-                    log::trace!("mismatch between object key and leaf low");
+                    trace_log!("mismatch between object key and leaf low");
 
                     hint::spin_loop();
 
@@ -335,7 +338,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             let leaf = write.leaf.as_mut().unwrap();
 
             if leaf.deleted.is_some() {
-                log::trace!("retry due to deleted node in page_in");
+                trace_log!("retry due to deleted node in page_in");
                 drop(write);
 
                 hint::spin_loop();
@@ -348,7 +351,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             if &*leaf.lo > key {
                 let size = leaf.in_memory_size;
                 drop(write);
-                log::trace!("key undershoot in page_in");
+                trace_log!("key undershoot in page_in");
                 self.cache.mark_access_and_evict(
                     node.object_id,
                     size,
@@ -365,7 +368,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             if let Some(ref hi) = leaf.hi {
                 if &**hi <= key {
                     let size = leaf.in_memory_size;
-                    log::trace!(
+                    trace_log!(
                         "key overshoot in page_in - search key {:?}, node hi {:?}",
                         key,
                         hi
@@ -428,7 +431,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             Some(successor_leaf.lo.as_ref()),
         );
 
-        log::trace!(
+        trace_log!(
             "merging empty predecessor node id {} with low key {:?} and high key {:?} \
             and successor node id {} with low key {:?} and high key {:?} into the \
             predecessor",
@@ -572,7 +575,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         leaf.max_unflushed_epoch = Some(old_dirty_epoch);
         leaf.page_out_on_flush.take();
 
-        log::trace!(
+        trace_log!(
             "cooperatively serializing leaf id {:?} with low key {:?}",
             object_id,
             leaf.lo
@@ -594,7 +597,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         let serialized =
             leaf_ref.serialize(self.cache.config.zstd_compression_level);
 
-        log::trace!(
+        trace_log!(
             "D adding node {} to dirty {:?}",
             object_id.0,
             old_dirty_epoch
@@ -652,13 +655,13 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             let leaf = leaf_guard.leaf_read.leaf.as_ref().unwrap();
 
             if leaf.deleted.is_some() {
-                log::trace!("retry due to deleted node in leaf_for_key");
+                trace_log!("retry due to deleted node in leaf_for_key");
                 drop(leaf_guard);
                 hint::spin_loop();
                 continue;
             }
             if &*leaf.lo > key {
-                log::trace!("key undershoot in leaf_for_key");
+                trace_log!("key undershoot in leaf_for_key");
                 drop(leaf_guard);
                 hint::spin_loop();
 
@@ -666,7 +669,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             }
             if let Some(ref hi) = leaf.hi {
                 if &**hi <= key {
-                    log::trace!("key overshoot on leaf_for_key");
+                    trace_log!("key overshoot on leaf_for_key");
                     // cache maintenance occurs in Drop for LeafReadGuard
                     drop(leaf_guard);
                     hint::spin_loop();
@@ -677,7 +680,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             if leaf.lo != node.low_key {
                 // TODO determine why this rare situation occurs and better
                 // understand whether it is really benign.
-                log::trace!("mismatch between object key and leaf low");
+                trace_log!("mismatch between object key and leaf low");
                 // cache maintenance occurs in Drop for LeafReadGuard
                 drop(leaf_guard);
                 hint::spin_loop();
@@ -727,7 +730,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             if old_dirty_epoch != flush_epoch_guard.epoch() {
                 assert!(old_dirty_epoch < flush_epoch_guard.epoch());
 
-                log::trace!(
+                trace_log!(
                     "cooperatively flushing {:?} with dirty {:?} after checking into {:?}",
                     node.object_id,
                     old_dirty_epoch,
@@ -832,7 +835,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         if split.is_some() || Some(value_ivec) != ret {
             leaf.mutation_count += 1;
             leaf.set_dirty_epoch(new_epoch);
-            log::trace!(
+            trace_log!(
                 "F adding node {} to dirty {:?}",
                 leaf_guard.node.object_id.0,
                 new_epoch
@@ -860,7 +863,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         }
         if let Some((split_key, rhs_node)) = split {
             assert_eq!(leaf.hi.as_ref().unwrap(), &split_key);
-            log::trace!(
+            trace_log!(
                 "G adding new from split {:?} to dirty {:?}",
                 rhs_node.object_id,
                 new_epoch
@@ -947,7 +950,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
 
             leaf.set_dirty_epoch(new_epoch);
 
-            log::trace!(
+            trace_log!(
                 "H adding node {} to dirty {:?}",
                 leaf_guard.node.object_id.0,
                 new_epoch
@@ -1093,7 +1096,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             leaf.mutation_count += 1;
 
             leaf.set_dirty_epoch(new_epoch);
-            log::trace!(
+            trace_log!(
                 "A adding node {} to dirty {:?}",
                 leaf_guard.node.object_id.0,
                 new_epoch
@@ -1120,7 +1123,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             }
         }
         if let Some((split_key, rhs_node)) = split {
-            log::trace!(
+            trace_log!(
                 "B adding new from split {:?} to dirty {:?}",
                 rhs_node.object_id,
                 new_epoch
@@ -1439,7 +1442,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
 
                 assert!(old_flush_epoch < new_epoch);
 
-                log::trace!(
+                trace_log!(
                     "cooperatively flushing {:?} with dirty {:?} after checking into {:?}",
                     node.object_id,
                     old_flush_epoch,
@@ -1777,12 +1780,12 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                     )?
                     .is_ok()
                 {
-                    log::trace!("pop_last removed item {:?}", first);
+                    trace_log!("pop_last removed item {:?}", first);
                     return Ok(Some(first));
                 }
             // try again
             } else {
-                log::trace!("pop_last removed nothing from empty tree");
+                trace_log!("pop_last removed nothing from empty tree");
                 return Ok(None);
             }
         }
@@ -1891,12 +1894,12 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                     )?
                     .is_ok()
                 {
-                    log::trace!("pop_first removed item {:?}", first);
+                    trace_log!("pop_first removed item {:?}", first);
                     return Ok(Some(first));
                 }
             // try again
             } else {
-                log::trace!("pop_first removed nothing from empty tree");
+                trace_log!("pop_first removed nothing from empty tree");
                 return Ok(None);
             }
         }
@@ -2064,14 +2067,14 @@ impl<const LEAF_FANOUT: usize> Iterator for Iter<LEAF_FANOUT> {
             if let Some(leaf_hi) = &leaf.hi {
                 if leaf_hi <= &search_key {
                     // concurrent merge, retry
-                    log::trace!("undershot in interator, retrying search");
+                    trace_log!("undershot in interator, retrying search");
                     continue;
                 }
             }
 
             if leaf.lo > search_key {
                 // concurrent successor split, retry
-                log::trace!("overshot in interator, retrying search");
+                trace_log!("overshot in interator, retrying search");
                 continue;
             }
 
@@ -2124,7 +2127,7 @@ impl<const LEAF_FANOUT: usize> DoubleEndedIterator for Iter<LEAF_FANOUT> {
 
             if leaf.lo > search_key {
                 // concurrent successor split, retry
-                log::trace!("overshot in reverse interator, retrying search");
+                trace_log!("overshot in reverse interator, retrying search");
                 continue;
             }
 
@@ -2143,7 +2146,7 @@ impl<const LEAF_FANOUT: usize> DoubleEndedIterator for Iter<LEAF_FANOUT> {
                 };
 
             if undershot {
-                log::trace!(
+                trace_log!(
                     "undershoot detected in reverse iterator with \
                     (leaf_hi, next_back_last_lo, self.bounds.1) being {:?}",
                     (&leaf.hi, &self.next_back_last_lo, &self.bounds.1)

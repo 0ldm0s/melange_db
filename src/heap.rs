@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering, fence};
 use std::time::{Duration, Instant};
@@ -511,7 +512,7 @@ impl Slab {
         slot: u64,
         _guard: &mut Guard<'_, DeferredFree, 16, 16>,
     ) -> io::Result<Vec<u8>> {
-        log::trace!("reading from slot {} in slab {}", slot, self.slot_size);
+        trace_log!("reading from slot {} in slab {}", slot, self.slot_size);
 
         let mut data = Vec::with_capacity(self.slot_size);
         unsafe {
@@ -595,7 +596,7 @@ impl Slab {
 
         let whence = self.slot_size as u64 * slot;
 
-        log::trace!("writing to slot {} in slab {}", slot, self.slot_size);
+        trace_log!("writing to slot {} in slab {}", slot, self.slot_size);
         sys_io::write_all_at(&self.file, &data, whence)
     }
 }
@@ -708,7 +709,7 @@ impl Heap {
         config: &Config,
     ) -> io::Result<HeapRecovery> {
         let path = &config.path;
-        log::trace!("recovering Heap at {:?}", path);
+        trace_log!("recovering Heap at {:?}", path);
         let slabs_dir = path.join("slabs");
 
         // TODO NOCOMMIT
@@ -717,7 +718,7 @@ impl Heap {
             .map(|status| status.success());
 
         if !matches!(sync_status, Ok(true)) {
-            log::warn!(
+            warn_log!(
                 "sync command before recovery failed: {:?}",
                 sync_status
             );
@@ -799,7 +800,7 @@ impl Heap {
 
         maybe!(fs::File::open(&slabs_dir).and_then(|f| f.sync_all()))?;
 
-        log::debug!("recovery of Heap at {:?} complete", path);
+        debug_log!("recovery of Heap at {:?} complete", path);
 
         Ok(HeapRecovery {
             heap: Heap {

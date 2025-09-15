@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 use std::time::{Duration, Instant};
 
 use cache_advisor::CacheAdvisor;
@@ -214,14 +215,14 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
         }
 
         if config.cache_capacity_bytes < 256 {
-            log::debug!(
+            debug_log!(
                 "Db configured to have Config.cache_capacity_bytes \
                 of under 256, so we will use the minimum of 256 bytes instead"
             );
         }
 
         if config.entry_cache_percent > 80 {
-            log::debug!(
+            debug_log!(
                 "Db configured to have Config.entry_cache_percent\
                 of over 80%, so we will clamp it to the maximum of 80% instead"
             );
@@ -481,7 +482,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
         }
 
         if not_found > 0 {
-            log::trace!(
+            trace_log!(
                 "during cache eviction, did not find {} nodes that we were trying to evict",
                 not_found
             );
@@ -497,7 +498,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
     pub fn flush(&self) -> io::Result<FlushStats> {
         let mut write_batch = vec![];
 
-        log::trace!("advancing epoch");
+        trace_log!("advancing epoch");
         let (
             previous_flush_complete_notifier,
             this_vacant_notifier,
@@ -506,7 +507,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
 
         let before_previous_block = Instant::now();
 
-        log::trace!(
+        trace_log!(
             "waiting for previous flush of {:?} to complete",
             previous_flush_complete_notifier.epoch()
         );
@@ -517,7 +518,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
 
         let before_current_quiescence = Instant::now();
 
-        log::trace!(
+        trace_log!(
             "waiting for our epoch {:?} to become vacant",
             this_vacant_notifier.epoch()
         );
@@ -564,7 +565,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                 Dirty::MergedAndDeleted { object_id, collection_id } => {
                     assert_eq!(object_id, dirty_object_id);
 
-                    log::trace!(
+                    trace_log!(
                         "MergedAndDeleted for {:?}, adding None to write_batch",
                         object_id
                     );
@@ -720,7 +721,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
 
                             Arc::into_inner(data).unwrap()
                         } else {
-                            log::error!(
+                            error_log!(
                                 "violation of flush responsibility for second read \
                                 of expected cooperative serialization. leaf in question's \
                                 dirty_flush_epoch is {:?}, our expected key was {:?}. node.deleted: {:?}",
@@ -761,7 +762,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
         }
 
         if !objects_to_defrag.is_empty() {
-            log::debug!(
+            debug_log!(
                 "objects to defrag (after flush loop): {}",
                 objects_to_defrag.len()
             );
@@ -797,13 +798,13 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                     Some(Ok(data)) => data,
                     Some(Err(e)) => {
                         let annotated = annotate!(e);
-                        log::error!(
+                        error_log!(
                             "failed to read object during GC: {annotated:?}"
                         );
                         continue;
                     }
                     None => {
-                        log::error!(
+                        error_log!(
                             "failed to read object during GC: object not found"
                         );
                         continue;
@@ -819,7 +820,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
             }
 
             if object_not_found > 0 {
-                log::debug!(
+                debug_log!(
                     "{} objects not found while defragmenting",
                     object_not_found
                 );
@@ -840,7 +841,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
 
         let write_batch_stats = if objects_flushed > 0 {
             let write_batch_stats = self.heap.write_batch(write_batch)?;
-            log::trace!(
+            trace_log!(
                 "marking {flush_through_epoch:?} as flushed - \
                 {objects_flushed} objects written, {write_batch_stats:?}",
             );
@@ -863,7 +864,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
             }
         }
 
-        log::trace!(
+        trace_log!(
             "marking the forward flush notifier that {:?} is flushed",
             flush_through_epoch
         );

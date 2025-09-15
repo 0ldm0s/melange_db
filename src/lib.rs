@@ -18,6 +18,7 @@ mod flush_epoch;
 mod heap;
 mod id_allocator;
 mod leaf;
+mod logging;
 mod metadata_store;
 mod object_cache;
 mod object_location_mapper;
@@ -236,20 +237,20 @@ struct ShutdownDropper<const LEAF_FANOUT: usize> {
 impl<const LEAF_FANOUT: usize> Drop for ShutdownDropper<LEAF_FANOUT> {
     fn drop(&mut self) {
         let (tx, rx) = std::sync::mpsc::channel();
-        log::debug!("sending shutdown signal to flusher");
+        debug_log!("sending shutdown signal to flusher");
         if self.shutdown_sender.lock().send(tx).is_ok() {
             if let Err(e) = rx.recv() {
-                log::error!("failed to shut down flusher thread: {:?}", e);
+                error_log!("failed to shut down flusher thread: {:?}", e);
             } else {
-                log::debug!("flush thread successfully terminated");
+                debug_log!("flush thread successfully terminated");
             }
         } else {
-            log::debug!(
+            debug_log!(
                 "failed to shut down flusher, manually flushing ObjectCache"
             );
             let cache = self.cache.lock();
             if let Err(e) = cache.flush() {
-                log::error!(
+                error_log!(
                     "Db flusher encountered error while flushing: {:?}",
                     e
                 );

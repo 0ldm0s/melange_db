@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::num::NonZeroU64;
 use std::path::{Path, PathBuf};
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 use std::sync::{
     Arc,
     atomic::{AtomicPtr, AtomicU64, Ordering},
@@ -78,7 +79,7 @@ fn get_compactions(
             ret.push(log_and_stats.log_sequence_number);
         }
         Err(e) => {
-            log::error!(
+            error_log!(
                 "metadata store worker thread unable to receive message, unexpected shutdown: {e:?}"
             );
             return Err(None);
@@ -109,7 +110,7 @@ fn worker(
         if let Err(error) = check_error(&inner.global_error) {
             drop(inner);
 
-            log::error!(
+            error_log!(
                 "compaction thread terminating after global error set to {:?}",
                 error
             );
@@ -130,7 +131,7 @@ fn worker(
                 match write_res {
                     Err(e) => {
                         set_error(&inner.global_error, &e);
-                        log::error!(
+                        error_log!(
                             "log compactor thread encountered error: {:?} - setting global fatal error and shutting down compactions",
                             e
                         );
@@ -148,7 +149,7 @@ fn worker(
             Err(Some(tx)) => {
                 drop(inner);
                 if let Err(e) = tx.send(()) {
-                    log::error!(
+                    error_log!(
                         "log compactor failed to send shutdown ack to system: {e:?}"
                     );
                 }
@@ -275,7 +276,7 @@ impl MetadataStore {
             .map(|status| status.success());
 
         if !matches!(sync_status, Ok(true)) {
-            log::warn!(
+            warn_log!(
                 "sync command before recovery failed: {:?}",
                 sync_status
             );
@@ -348,7 +349,7 @@ impl MetadataStore {
     ) -> io::Result<MetadataRecovery> {
         let path = storage_directory.as_ref();
 
-        log::debug!("opening MetadataStore at {:?}", path);
+        debug_log!("opening MetadataStore at {:?}", path);
 
         let (log_ids, snapshot_id_opt) = enumerate_logs_and_snapshot(path)?;
 
@@ -541,7 +542,7 @@ fn read_frame(
     ]);
 
     if crc_actual != crc_recorded {
-        log::warn!("encountered incorrect crc for batch in log");
+        warn_log!("encountered incorrect crc for batch in log");
         return Err(annotate!(io::Error::new(
             io::ErrorKind::InvalidData,
             "crc mismatch for read of batch frame",
@@ -622,7 +623,7 @@ fn read_log(
     directory_path: &Path,
     lsn: u64,
 ) -> io::Result<FnvHashMap<ObjectId, UpdateMetadata>> {
-    log::trace!("reading log {lsn}");
+    trace_log!("reading log {lsn}");
     let mut ret = FnvHashMap::default();
 
     let mut file = fallible!(fs::File::open(log_path(directory_path, lsn)));
@@ -635,7 +636,7 @@ fn read_log(
         }
     }
 
-    log::trace!("recovered {} items in log {}", ret.len(), lsn);
+    trace_log!("recovered {} items in log {}", ret.len(), lsn);
 
     Ok(ret)
 }
@@ -645,7 +646,7 @@ fn read_snapshot(
     directory_path: &Path,
     lsn: u64,
 ) -> io::Result<(FnvHashMap<ObjectId, UpdateMetadata>, u64)> {
-    log::trace!("reading snapshot {lsn}");
+    trace_log!("reading snapshot {lsn}");
     let mut reusable_frame_buffer: Vec<u8> = vec![];
     let mut file =
         fallible!(fs::File::open(snapshot_path(directory_path, lsn, false)));
@@ -657,7 +658,7 @@ fn read_snapshot(
         .map(|update_metadata| (update_metadata.object_id(), update_metadata))
         .collect();
 
-    log::trace!("recovered {} items in snapshot {}", frame.len(), lsn);
+    trace_log!("recovered {} items in snapshot {}", frame.len(), lsn);
 
     Ok((frame, size))
 }
@@ -686,7 +687,7 @@ fn enumerate_logs_and_snapshot(
         let file_name = if let Ok(f) = dir_entry.file_name().into_string() {
             f
         } else {
-            log::warn!(
+            warn_log!(
                 "skipping unexpected file with non-unicode name {:?}",
                 dir_entry.file_name()
             );
@@ -694,7 +695,7 @@ fn enumerate_logs_and_snapshot(
         };
 
         if file_name.ends_with(TMP_SUFFIX) {
-            log::warn!("removing incomplete snapshot rewrite {file_name:?}");
+            warn_log!("removing incomplete snapshot rewrite {file_name:?}");
             fallible!(fs::remove_file(directory_path.join(file_name)));
         } else if file_name.starts_with(LOG_PREFIX) {
             let start = LOG_PREFIX.len() + 1;
@@ -712,12 +713,12 @@ fn enumerate_logs_and_snapshot(
             if let Ok(id) = u64::from_str_radix(&file_name[start..stop], 16) {
                 if let Some(snap_id) = snapshot {
                     if snap_id < id {
-                        log::warn!(
+                        warn_log!(
                             "removing stale snapshot {id} that is superceded by snapshot {id}"
                         );
 
                         if let Err(e) = fs::remove_file(&file_name) {
-                            log::warn!(
+                            warn_log!(
                                 "failed to remove stale snapshot file {:?}: {:?}",
                                 file_name,
                                 e
@@ -739,7 +740,7 @@ fn enumerate_logs_and_snapshot(
     for stale_log_id in logs.range(..=snap_id) {
         let file_name = log_path(directory_path, *stale_log_id);
 
-        log::warn!(
+        warn_log!(
             "removing stale log {file_name:?} that is contained within snapshot {snap_id}"
         );
 
@@ -788,7 +789,7 @@ fn read_snapshot_and_apply_logs(
     let mut recovered: FnvHashMap<ObjectId, UpdateMetadata> =
         snapshot_rx.recv().unwrap()?;
 
-    log::trace!("recovered snapshot contains {recovered:?}");
+    trace_log!("recovered snapshot contains {recovered:?}");
 
     for (log_id, log_datum) in log_data_res? {
         max_log_id = max_log_id.max(log_id);
@@ -799,7 +800,7 @@ fn read_snapshot_and_apply_logs(
             } else {
                 let previous = recovered.remove(&object_id);
                 if previous.is_none() {
-                    log::trace!(
+                    trace_log!(
                         "recovered a Free for {object_id:?} without a preceeding Store"
                     );
                 }
@@ -816,7 +817,7 @@ fn read_snapshot_and_apply_logs(
     let snapshot_size = new_snapshot_data.len() as u64;
 
     let new_snapshot_tmp_path = snapshot_path(path, max_log_id, true);
-    log::trace!("writing snapshot to {new_snapshot_tmp_path:?}");
+    trace_log!("writing snapshot to {new_snapshot_tmp_path:?}");
 
     let mut snapshot_file_opts = fs::OpenOptions::new();
     snapshot_file_opts.create(true).read(false).write(true);
@@ -830,7 +831,7 @@ fn read_snapshot_and_apply_logs(
     fallible!(snapshot_file.sync_all());
 
     let new_snapshot_path = snapshot_path(path, max_log_id, false);
-    log::trace!("renaming written snapshot to {new_snapshot_path:?}");
+    trace_log!("renaming written snapshot to {new_snapshot_path:?}");
     fallible!(fs::rename(new_snapshot_tmp_path, new_snapshot_path));
     fallible!(locked_directory.sync_all());
 

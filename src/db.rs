@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 use crate::*;
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 
 /// melange_db - 高性能嵌入式数据库
 ///
@@ -91,14 +92,14 @@ fn flusher<const LEAF_FANOUT: usize>(
                 return;
             }
             Ok(Err(flush_failure)) => {
-                log::error!(
+                error_log!(
                     "Db flusher 在刷新时遇到错误: {:?}",
                     flush_failure
                 );
                 cache.set_error(&flush_failure);
             }
             Err(panicked) => {
-                log::error!(
+                error_log!(
                     "Db flusher 在刷新时发生恐慌: {:?}",
                     panicked
                 );
@@ -129,11 +130,11 @@ fn flusher<const LEAF_FANOUT: usize>(
             drop(cache);
 
             if let Err(e) = shutdown_sender.send(()) {
-                log::error!(
+                error_log!(
                     "Db flusher 无法向请求者确认关闭: {e:?}"
                 );
             }
-            log::debug!(
+            debug_log!(
                 "flush 线程在向请求者发出信号后终止"
             );
             return;
@@ -151,7 +152,7 @@ impl<const LEAF_FANOUT: usize> Drop for Db<LEAF_FANOUT> {
     fn drop(&mut self) {
         if self.config.flush_every_ms.is_none() {
             if let Err(e) = self.flush() {
-                log::error!("在 Drop 时刷新 Db 失败: {e:?}");
+                error_log!("在 Drop 时刷新 Db 失败: {e:?}");
             }
         } else {
             // 否则，预期 flusher 线程将在关闭最后的 Db/Tree 实例时刷新
@@ -200,7 +201,7 @@ impl<const LEAF_FANOUT: usize> Db<LEAF_FANOUT> {
             assert_eq!(hi_none_count, 1);
         }
 
-        log::debug!(
+        debug_log!(
             "{} 个叶子节点在 {} 微秒后看起来正常",
             ever_seen.len(),
             before.elapsed().as_micros()
