@@ -12,6 +12,8 @@
 
 #[cfg(feature = "for-internal-testing-only")]
 mod block_checker;
+pub mod block_cache;
+pub mod bloom_filter;
 mod config;
 mod db;
 mod flush_epoch;
@@ -22,6 +24,7 @@ mod logging;
 mod metadata_store;
 mod object_cache;
 mod object_location_mapper;
+pub mod simd_optimized;
 mod tree;
 
 #[cfg(any(
@@ -48,8 +51,11 @@ fn debug_delay() {
     }
 }
 
+pub use crate::block_cache::{CacheManager, CacheConfig, AccessPattern};
+pub use crate::bloom_filter::{BloomFilter, ConcurrentBloomFilter, TieredBloomFilter, FilterTier};
 pub use crate::config::{Config, CacheWarmupStrategy};
 pub use crate::db::Db;
+pub use crate::simd_optimized::{SimdComparator, KeyComparator};
 pub use crate::tree::{Batch, Iter, Tree};
 pub use inline_array::InlineArray;
 
