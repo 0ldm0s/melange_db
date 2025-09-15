@@ -137,7 +137,6 @@ pub(crate) struct ReadStatTracker {
     pub sum_deserialization_latency_us: AtomicU64,
 }
 
-#[derive(Clone)]
 pub struct ObjectCache<const LEAF_FANOUT: usize> {
     pub config: Config,
     global_error: Arc<AtomicPtr<(io::ErrorKind, String)>>,
@@ -148,7 +147,7 @@ pub struct ObjectCache<const LEAF_FANOUT: usize> {
         EBR_LOCAL_GC_BUFFER_SIZE,
     >,
     heap: Heap,
-    cache_advisor: RefCell<CacheAdvisor>,
+    cache_advisor: RwLock<CacheAdvisor>,
     flush_epoch: FlushEpochTracker,
     dirty: ConcurrentMap<(FlushEpoch, ObjectId), Dirty<LEAF_FANOUT>, 4>,
     compacted_heap_slots: Arc<AtomicU64>,
@@ -163,6 +162,27 @@ pub struct ObjectCache<const LEAF_FANOUT: usize> {
 impl<const LEAF_FANOUT: usize> std::panic::RefUnwindSafe
     for ObjectCache<LEAF_FANOUT>
 {
+}
+
+impl<const LEAF_FANOUT: usize> Clone for ObjectCache<LEAF_FANOUT> {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            global_error: self.global_error.clone(),
+            object_id_index: self.object_id_index.clone(),
+            heap: self.heap.clone(),
+            cache_advisor: RwLock::new(self.cache_advisor.read().clone()),
+            flush_epoch: self.flush_epoch.clone(),
+            dirty: self.dirty.clone(),
+            compacted_heap_slots: self.compacted_heap_slots.clone(),
+            tree_leaves_merged: self.tree_leaves_merged.clone(),
+            #[cfg(feature = "for-internal-testing-only")]
+            event_verifier: self.event_verifier.clone(),
+            invariants: self.invariants.clone(),
+            flush_stats: self.flush_stats.clone(),
+            read_stats: self.read_stats.clone(),
+        }
+    }
 }
 
 impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
@@ -206,7 +226,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
         let pc = ObjectCache {
             config: config.clone(),
             object_id_index,
-            cache_advisor: RefCell::new(CacheAdvisor::new(
+            cache_advisor: RwLock::new(CacheAdvisor::new(
                 config.cache_capacity_bytes.max(256),
                 config.entry_cache_percent.min(80),
             )),
@@ -400,7 +420,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
         size: usize,
         #[allow(unused)] flush_epoch: FlushEpoch,
     ) -> io::Result<()> {
-        let mut ca = self.cache_advisor.borrow_mut();
+        let mut ca = self.cache_advisor.write();
         let to_evict = ca.accessed_reuse_buffer(*accessed_object_id, size);
         let mut not_found = 0;
         for (node_to_evict, _rough_size) in to_evict {
