@@ -158,6 +158,9 @@ pub struct ObjectCache<const LEAF_FANOUT: usize> {
     invariants: Arc<FlushInvariants>,
     flush_stats: Arc<RwLock<FlushStatTracker>>,
     pub(super) read_stats: Arc<ReadStatTracker>,
+    // 优化组件
+    bloom_filter: Arc<RwLock<BloomFilter>>,
+    block_cache: Arc<CacheManager>,
 }
 
 impl<const LEAF_FANOUT: usize> std::panic::RefUnwindSafe
@@ -182,6 +185,8 @@ impl<const LEAF_FANOUT: usize> Clone for ObjectCache<LEAF_FANOUT> {
             invariants: self.invariants.clone(),
             flush_stats: self.flush_stats.clone(),
             read_stats: self.read_stats.clone(),
+            bloom_filter: self.bloom_filter.clone(),
+            block_cache: self.block_cache.clone(),
         }
     }
 }
@@ -228,6 +233,16 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
             );
         }
 
+        // 初始化优化组件
+        let bloom_filter = Arc::new(RwLock::new(BloomFilter::new(1_000_000, 0.01)));
+        let block_cache_config = CacheConfig {
+            max_size: config.cache_capacity_bytes / 4, // 使用25%的缓存容量
+            block_size: 4096,
+            enable_prefetch: true,
+            ..Default::default()
+        };
+        let block_cache = Arc::new(CacheManager::new(block_cache_config));
+
         let pc = ObjectCache {
             config: config.clone(),
             object_id_index,
@@ -246,6 +261,8 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
             invariants: Arc::default(),
             flush_stats: Arc::default(),
             read_stats: Arc::default(),
+            bloom_filter,
+            block_cache,
         };
 
         Ok((pc, indices, was_recovered))
@@ -298,6 +315,19 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                 .sum_read_io_latency_us
                 .load(Ordering::Acquire),
         }
+    }
+
+    // 优化组件访问方法
+    pub fn bloom_filter_contains(&self, key: &[u8]) -> bool {
+        self.bloom_filter.read().contains(key)
+    }
+
+    pub fn bloom_filter_insert(&self, key: &[u8]) {
+        self.bloom_filter.write().insert(key);
+    }
+
+    pub fn get_block_cache_stats(&self) -> block_cache::CacheStats {
+        self.block_cache.stats()
     }
 
     pub fn check_error(&self) -> io::Result<()> {
