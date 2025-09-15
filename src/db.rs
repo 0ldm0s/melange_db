@@ -71,6 +71,10 @@ impl<const LEAF_FANOUT: usize> fmt::Debug for Db<LEAF_FANOUT> {
     }
 }
 
+// 线程安全实现：Db可以在多线程间安全共享
+unsafe impl<const LEAF_FANOUT: usize> Send for Db<LEAF_FANOUT> {}
+unsafe impl<const LEAF_FANOUT: usize> Sync for Db<LEAF_FANOUT> {}
+
 fn flusher<const LEAF_FANOUT: usize>(
     cache: ObjectCache<LEAF_FANOUT>,
     shutdown_signal: mpsc::Receiver<mpsc::Sender<()>>,

@@ -64,6 +64,10 @@ impl<const LEAF_FANOUT: usize> fmt::Debug for Tree<LEAF_FANOUT> {
     }
 }
 
+// 线程安全实现：Tree可以在多线程间安全共享
+unsafe impl<const LEAF_FANOUT: usize> Send for Tree<LEAF_FANOUT> {}
+unsafe impl<const LEAF_FANOUT: usize> Sync for Tree<LEAF_FANOUT> {}
+
 #[must_use]
 struct LeafReadGuard<'a, const LEAF_FANOUT: usize = 1024> {
     leaf_read:

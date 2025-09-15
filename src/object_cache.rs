@@ -185,6 +185,10 @@ impl<const LEAF_FANOUT: usize> Clone for ObjectCache<LEAF_FANOUT> {
     }
 }
 
+// 线程安全实现：ObjectCache可以在多线程间安全共享
+unsafe impl<const LEAF_FANOUT: usize> Send for ObjectCache<LEAF_FANOUT> {}
+unsafe impl<const LEAF_FANOUT: usize> Sync for ObjectCache<LEAF_FANOUT> {}
+
 impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
     /// Returns the recovered ObjectCache, the tree indexes, and a bool signifying whether the system
     /// was recovered or not
