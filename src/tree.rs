@@ -772,6 +772,13 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
 
         let key_ref = key.as_ref();
 
+        // 使用布隆过滤器进行快速过滤
+        if !self.cache.bloom_filter_contains(key_ref) {
+            // 布隆过滤器判断key不存在，直接返回None
+            // 注意：可能有极小的误判率，但这是可接受的
+            return Ok(None);
+        }
+
         let leaf_guard = self.leaf_for_key(key_ref)?;
 
         let leaf = leaf_guard.leaf_read.leaf.as_ref().unwrap();
@@ -780,7 +787,14 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             assert!(&**hi > key_ref);
         }
 
-        Ok(leaf.get(key_ref).cloned())
+        let result = leaf.get(key_ref).cloned();
+
+        // 如果找到了key，确保它在布隆过滤器中（避免误判）
+        if result.is_some() {
+            self.cache.bloom_filter_insert(key_ref);
+        }
+
+        Ok(result)
     }
 
     /// Insert a key to a new value, returning the last value if it
@@ -818,6 +832,9 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         let leaf = leaf_guard.leaf_write.leaf.as_mut().unwrap();
 
         let ret = leaf.insert(key_ref.into(), value_ivec.clone());
+
+        // 更新布隆过滤器
+        self.cache.bloom_filter_insert(key_ref);
 
         let old_size =
             ret.as_ref().map(|v| key_ref.len() + v.len()).unwrap_or(0);
