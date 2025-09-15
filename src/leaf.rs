@@ -1,4 +1,5 @@
 use crate::*;
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 
 /// 增量序列化变更跟踪结构
 /// 用于跟踪leaf节点自上次完整序列化以来的变更
@@ -312,7 +313,7 @@ impl<const LEAF_FANOUT: usize> Leaf<LEAF_FANOUT> {
 
         zstd_enc.finish().unwrap();
 
-        log::debug!("增量序列化: {} 个变更，大小: {} 字节",
+        debug_log!("增量序列化: {} 个变更，大小: {} 字节",
                    changes.modified_keys.len() + changes.deleted_keys.len(),
                    ret.len());
 
@@ -357,7 +358,7 @@ impl<const LEAF_FANOUT: usize> Leaf<LEAF_FANOUT> {
         leaf.incremental_changes = Some(changes);
         leaf.last_serialized_version = base_version;
 
-        log::debug!("增量反序列化: 基础版本 {}, 当前版本 {}",
+        debug_log!("增量反序列化: 基础版本 {}, 当前版本 {}",
                    base_version, current_version);
 
         Ok(leaf)
@@ -441,7 +442,7 @@ impl<const LEAF_FANOUT: usize> Leaf<LEAF_FANOUT> {
 
             let rhs_id = allocator.allocate_object_id(new_epoch);
 
-            log::trace!(
+            trace_log!(
                 "split leaf {:?} at split key: {:?} into new {:?} at {:?}",
                 self.lo,
                 split_key,

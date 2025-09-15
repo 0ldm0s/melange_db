@@ -37,7 +37,8 @@ crc32fast = "1.3.2"
 ebr = "0.2.13"
 inline-array = { version = "0.1.13", features = ["serde", "concurrent_map_minimum"] }
 fs2 = "0.4.3"
-log = "0.4.19"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 pagetable = "0.4.5"
 parking_lot = { version = "0.12.1", features = ["arc_lock"] }
 rayon = "1.7.0"

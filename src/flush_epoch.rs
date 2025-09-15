@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 use serde::{Serialize, Deserialize};
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 
 const SEAL_BIT: u64 = 1 << 63;
 const SEAL_MASK: u64 = u64::MAX - SEAL_BIT;
@@ -241,7 +242,7 @@ impl OptimizedFlushScheduler {
         // 等待所有线程完成
         for handle in self.thread_pool {
             if let Err(e) = handle.join() {
-                log::error!("Flush worker thread panicked: {:?}", e);
+                error_log!("Flush worker thread panicked: {:?}", e);
             }
         }
     }
@@ -377,7 +378,7 @@ fn perform_flush(epoch: FlushEpoch, data: Vec<u8>) -> std::io::Result<()> {
     std::thread::sleep(Duration::from_millis(1));
 
     let duration = start_time.elapsed();
-    log::debug!("Flush epoch {:?} completed in {:?}", epoch, duration);
+    debug_log!("Flush epoch {:?} completed in {:?}", epoch, duration);
 
     Ok(())
 }
@@ -396,7 +397,7 @@ fn perform_batch_flush(tasks: Vec<BatchFlushTask>) -> Vec<std::io::Result<()>> {
         .collect();
 
     let duration = start_time.elapsed();
-    log::debug!("Batch flush of {} tasks completed in {:?}", results.len(), duration);
+    debug_log!("Batch flush of {} tasks completed in {:?}", results.len(), duration);
 
     results
 }
@@ -497,7 +498,7 @@ impl Completion {
         if !previously_sealed {
             // TODO reevaluate - assert!(!*mu);
         }
-        log::trace!("marking epoch {:?} as complete", self.epoch);
+        trace_log!("marking epoch {:?} as complete", self.epoch);
         // it's possible for *mu to already be true due to this being
         // immediately dropped in the check_in method when we see that
         // the checked-in epoch has already been marked as sealed.

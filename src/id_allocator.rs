@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use crossbeam_queue::SegQueue;
+use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 use fnv::FnvHashSet;
 use parking_lot::Mutex;
 
@@ -50,7 +51,7 @@ impl Allocator {
             next_to_allocate - free_and_tip.free_set.len() as u64;
         let actual_ratio = live_objects as f32 / next_to_allocate as f32;
 
-        log::trace!(
+        trace_log!(
             "fragmented_slots actual ratio: {actual_ratio}, free len: {}",
             free_and_tip.free_set.len()
         );

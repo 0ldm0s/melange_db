@@ -1,8 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Read(//Users/0ldm0s/workspaces/rust/**)",
-      "Bash(cargo check)"
+      "Read(//Users/0ldm0s/.cargo/**)",
+      "Bash(find /Users/0ldm0s/workspaces/rust/melange_db/src -name \"*.rs\" -type f -exec sed -i '' 's/log::debug!/debug_log!/g' {} ;)",
+      "Bash(find /Users/0ldm0s/workspaces/rust/melange_db/src -name \"*.rs\" -type f -exec sed -i '' 's/log::error!/error_log!/g' {} ;)",
+      "Bash(find /Users/0ldm0s/workspaces/rust/melange_db/src -name \"*.rs\" -type f -exec sed -i '' 's/log::warn!/warn_log!/g' {} ;)",
+      "Bash(find /Users/0ldm0s/workspaces/rust/melange_db/src -name \"*.rs\" -type f -exec sed -i '' 's/log::trace!/trace_log!/g' {} ;)",
+      "Bash(find /Users/0ldm0s/workspaces/rust/melange_db/src -name \"*.rs\" -type f -exec grep -l \"debug_log\\|trace_log\\|warn_log\\|error_log\\|info_log\" {} ;)",
+      "Bash(for file in /Users/0ldm0s/workspaces/rust/melange_db/src/object_cache.rs /Users/0ldm0s/workspaces/rust/melange_db/src/heap.rs /Users/0ldm0s/workspaces/rust/melange_db/src/metadata_store.rs /Users/0ldm0s/workspaces/rust/melange_db/src/leaf.rs /Users/0ldm0s/workspaces/rust/melange_db/src/flush_epoch.rs /Users/0ldm0s/workspaces/rust/melange_db/src/id_allocator.rs)",
+      "Bash(do)",
+      "Bash(if [ -f \"$file\" ])",
+      "Bash(! grep -q \"use crate::.*_log\" \"$file\")",
+      "Bash(then)",
+      "Bash(sed -i '' '/^use crate::\\*/a\\\nuse crate::{debug_log, trace_log, warn_log, error_log, info_log};' \"$file\")",
+      "Bash(fi)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []
