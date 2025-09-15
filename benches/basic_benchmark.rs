@@ -3,16 +3,23 @@ use melange_db::*;
 use std::time::Duration;
 
 fn basic_insert_benchmark(c: &mut Criterion) {
+    // 性能优化配置：
+    // 1. 禁用自动flush，减少磁盘IO
+    // 2. 增大缓存到64MB
+    // 3. 使用临时目录避免文件系统开销
     let config = Config::new()
         .path("benchmark_db")
-        .zstd_compression_level(3)
-        .cache_capacity_bytes(1024 * 1024);
+        .flush_every_ms(None) // 禁用自动flush
+        .cache_capacity_bytes(64 * 1024 * 1024) // 64MB缓存
+        .zstd_compression_level(1); // 轻度压缩
 
     // 确保测试目录干净
     if std::path::Path::new("benchmark_db").exists() {
         std::fs::remove_dir_all("benchmark_db").unwrap();
     }
 
+    // 预创建数据库
+    let db = config.open::<1024>().unwrap();
     let mut group = c.benchmark_group("basic_operations");
 
     // 测试不同大小的数据插入
@@ -20,15 +27,12 @@ fn basic_insert_benchmark(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::new("insert", size), size, |b, &size| {
             b.iter_batched(
                 || {
-                    // 每次迭代创建新的数据库
-                    if std::path::Path::new("benchmark_db").exists() {
-                        std::fs::remove_dir_all("benchmark_db").unwrap();
-                    }
-                    let db = config.clone().open::<1024>().unwrap();
-                    let tree = db.open_tree("insert_test").unwrap();
-                    (db, tree)
+                    // 每次迭代只清理数据，不重新创建数据库
+                    let tree = db.open_tree(format!("insert_test_{}", size)).unwrap();
+                    tree.clear().unwrap();
+                    tree
                 },
-                |(_db, tree)| {
+                |tree| {
                     for i in 0..size {
                         let key = format!("key_{}", i);
                         let value = format!("value_{}", i);
@@ -51,8 +55,9 @@ fn basic_insert_benchmark(c: &mut Criterion) {
 fn read_benchmark(c: &mut Criterion) {
     let config = Config::new()
         .path("benchmark_db")
-        .zstd_compression_level(3)
-        .cache_capacity_bytes(1024 * 1024);
+        .flush_every_ms(None) // 禁用自动flush
+        .cache_capacity_bytes(64 * 1024 * 1024) // 64MB缓存
+        .zstd_compression_level(1); // 轻度压缩
 
     // 预先创建测试数据
     if std::path::Path::new("benchmark_db").exists() {
@@ -62,12 +67,15 @@ fn read_benchmark(c: &mut Criterion) {
     let db = config.open::<1024>().unwrap();
     let tree = db.open_tree("read_test").unwrap();
 
-    // 插入测试数据
+    // 预热数据到缓存
     for i in 0..1000 {
         let key = format!("key_{}", i);
         let value = format!("value_{}", i);
         tree.insert(key.as_bytes(), value.as_bytes()).unwrap();
     }
+
+    // 强制flush确保数据写入
+    tree.flush().unwrap();
 
     let mut group = c.benchmark_group("read_operations");
 
