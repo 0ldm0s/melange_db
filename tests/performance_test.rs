@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 创建测试配置
     let config = Config::new()
-        .path("test_db")
+        .path("perf_test_db")
         .flush_every_ms(Some(100))
         .cache_capacity_bytes(1024 * 1024) // 1MB 缓存
         .cache_warmup_strategy(CacheWarmupStrategy::None)
@@ -26,8 +26,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .zstd_compression_level(3);
 
     // 删除旧测试数据库
-    if std::path::Path::new("test_db").exists() {
-        std::fs::remove_dir_all("test_db")?;
+    if std::path::Path::new("perf_test_db").exists() {
+        std::fs::remove_dir_all("perf_test_db")?;
     }
 
     // 创建数据库
@@ -145,7 +145,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     drop(db);
 
     // 删除测试数据库
-    std::fs::remove_dir_all("test_db")?;
+    std::fs::remove_dir_all("perf_test_db")?;
 
     println!("\n🎉 所有性能测试完成！");
     println!("📈 总结:");

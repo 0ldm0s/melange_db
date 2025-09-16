@@ -19,9 +19,42 @@ mod optimization_tests {
     use melange_db::block_cache::{CacheManager, CacheConfig, CacheBlock, AccessPattern};
     use std::collections::HashMap;
 
-    const TEST_KEY_COUNT: usize = 100_000;
-    const QUERY_COUNT: usize = 50_000;
-    const CACHE_SIZE: usize = 64 * 1024 * 1024; // 64MB
+    /// 根据设备性能动态调整的测试参数
+    fn get_test_parameters() -> (usize, usize, usize) {
+        // 检测可用内存
+        if let Ok(mem_info) = std::fs::read_to_string("/proc/meminfo") {
+            for line in mem_info.lines() {
+                if line.starts_with("MemAvailable:") || line.starts_with("MemFree:") {
+                    let parts: Vec<&str> = line.split_whitespace().collect();
+                    if let Some(mem_kb) = parts.get(1) {
+                        if let Ok(mem) = mem_kb.parse::<usize>() {
+                            return calculate_parameters_from_memory(mem);
+                        }
+                    }
+                }
+            }
+        }
+        // 默认参数（保守估计）
+        (5_000, 2_000, 8 * 1024 * 1024)
+    }
+
+    /// 根据可用内存计算合适的测试参数
+    fn calculate_parameters_from_memory(available_memory_kb: usize) -> (usize, usize, usize) {
+        let available_memory_mb = available_memory_kb / 1024;
+
+        // 根据可用内存调整参数
+        if available_memory_mb >= 8192 {  // 8GB+ - 高性能设备
+            (50_000, 25_000, 64 * 1024 * 1024)
+        } else if available_memory_mb >= 4096 {  // 4GB+ - 中等性能
+            (25_000, 12_000, 32 * 1024 * 1024)
+        } else if available_memory_mb >= 2048 {  // 2GB+ - 低性能
+            (10_000, 5_000, 16 * 1024 * 1024)
+        } else if available_memory_mb >= 1024 {  // 1GB+ - 很低性能（如树莓派3B+）
+            (5_000, 2_000, 8 * 1024 * 1024)
+        } else {  // <1GB - 极低性能
+            (2_000, 1_000, 4 * 1024 * 1024)
+        }
+    }
 
     /// 生成测试keys
     fn generate_test_keys(count: usize) -> Vec<Vec<u8>> {
@@ -80,8 +113,9 @@ mod optimization_tests {
     fn test_bloom_filter_performance() {
         println!("=== 布隆过滤器性能测试 ===");
 
-        let keys = generate_test_keys(TEST_KEY_COUNT);
-        let mut bloom_filter = BloomFilter::new(TEST_KEY_COUNT, 0.01);
+        let (test_key_count, query_count, _) = get_test_parameters();
+        let keys = generate_test_keys(test_key_count);
+        let mut bloom_filter = BloomFilter::new(test_key_count, 0.01);
 
         // 插入测试
         let insert_start = Instant::now();
@@ -91,7 +125,7 @@ mod optimization_tests {
         let insert_duration = insert_start.elapsed();
 
         println!("插入性能: {:.0} items/sec",
-                 TEST_KEY_COUNT as f64 / insert_duration.as_secs_f64());
+                 test_key_count as f64 / insert_duration.as_secs_f64());
 
         // 查询测试 - 存在的keys
         let query_start = Instant::now();
@@ -104,11 +138,11 @@ mod optimization_tests {
         let query_duration = query_start.elapsed();
 
         println!("查询性能(存在): {:.0} queries/sec",
-                 TEST_KEY_COUNT as f64 / query_duration.as_secs_f64());
-        println!("命中率: {}/{}", true_positives, TEST_KEY_COUNT);
+                 test_key_count as f64 / query_duration.as_secs_f64());
+        println!("命中率: {}/{}", true_positives, test_key_count);
 
         // 查询测试 - 不存在的keys
-        let other_keys = generate_test_keys(QUERY_COUNT);
+        let other_keys = generate_test_keys(query_count);
         let false_positives_start = Instant::now();
         let mut false_positives = 0;
         for key in &other_keys {
@@ -118,9 +152,9 @@ mod optimization_tests {
         }
         let false_positives_duration = false_positives_start.elapsed();
 
-        let false_positive_rate = false_positives as f64 / QUERY_COUNT as f64;
+        let false_positive_rate = false_positives as f64 / query_count as f64;
         println!("查询性能(不存在): {:.0} queries/sec",
-                 QUERY_COUNT as f64 / false_positives_duration.as_secs_f64());
+                 query_count as f64 / false_positives_duration.as_secs_f64());
         println!("误判率: {:.4}%", false_positive_rate * 100.0);
 
         // 显示统计信息
@@ -134,8 +168,9 @@ mod optimization_tests {
     fn test_block_cache_performance() {
         println!("=== 块缓存性能测试 ===");
 
+        let (_, _, cache_size) = get_test_parameters();
         let config = CacheConfig {
-            max_size: CACHE_SIZE,
+            max_size: cache_size,
             block_size: 4096,
             enable_prefetch: true,
             ..Default::default()
@@ -160,9 +195,10 @@ mod optimization_tests {
                  test_data.len() as f64 / write_duration.as_secs_f64());
 
         // 读取测试 - 热数据
+        let (_, query_count, _) = get_test_parameters();
         let mut cache_hits = 0;
         let read_start = Instant::now();
-        for _ in 0..QUERY_COUNT {
+        for _ in 0..query_count {
             let block_id = (rand::random::<u64>() % 1000) as u64;
             if cache_manager.read_block(block_id).is_some() {
                 cache_hits += 1;
@@ -170,9 +206,9 @@ mod optimization_tests {
         }
         let read_duration = read_start.elapsed();
 
-        let hit_rate = cache_hits as f64 / QUERY_COUNT as f64;
+        let hit_rate = cache_hits as f64 / query_count as f64;
         println!("读取性能: {:.0} queries/sec",
-                 QUERY_COUNT as f64 / read_duration.as_secs_f64());
+                 query_count as f64 / read_duration.as_secs_f64());
         println!("缓存命中率: {:.2}%", hit_rate * 100.0);
 
         // 显示缓存统计
@@ -187,9 +223,16 @@ mod optimization_tests {
     fn test_comprehensive_query_performance() {
         println!("=== 综合查询性能测试 ===");
 
-        // 创建临时数据库
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test_db");
+        // 根据设备性能获取测试参数
+        let (test_key_count, query_count, cache_size) = get_test_parameters();
+        println!("设备适配参数: keys={}, queries={}, cache={}MB",
+                 test_key_count, query_count, cache_size / (1024 * 1024));
+
+        // 创建测试数据库目录
+        let db_path = std::path::PathBuf::from("optimization_perf_test_db");
+        if db_path.exists() {
+            std::fs::remove_dir_all(&db_path).unwrap();
+        }
 
         let db: Db<1024> = Config::new()
             .path(&db_path)
@@ -199,7 +242,7 @@ mod optimization_tests {
         let tree = db.open_tree::<&[u8]>(b"performance_test").unwrap();
 
         // 准备测试数据
-        let keys = generate_test_keys(TEST_KEY_COUNT);
+        let keys = generate_test_keys(test_key_count);
         let values: Vec<Vec<u8>> = keys.iter()
             .map(|_| {
                 let mut value = vec![0u8; 1024]; // 1KB值
@@ -215,39 +258,42 @@ mod optimization_tests {
         for (i, (key, value)) in keys.iter().zip(&values).enumerate() {
             tree.insert(key.as_slice(), value.as_slice()).unwrap();
 
-            if i % 10000 == 0 {
-                println!("写入进度: {}/{}", i, TEST_KEY_COUNT);
+            // 调整进度显示频率，至少显示10次进度，但不要太频繁
+            let progress_interval = (test_key_count / 10).max(100);
+            if i % progress_interval == 0 || i == test_key_count - 1 {
+                println!("写入进度: {}/{}", i + 1, test_key_count);
             }
         }
         let write_duration = write_start.elapsed();
 
         println!("写入性能: {:.0} ops/sec",
-                 TEST_KEY_COUNT as f64 / write_duration.as_secs_f64());
+                 test_key_count as f64 / write_duration.as_secs_f64());
 
         // 读取性能测试 - 随机访问
         let read_start = Instant::now();
         let mut found = 0;
-        for _ in 0..QUERY_COUNT {
-            let key_index = rand::thread_rng().random_range(0..TEST_KEY_COUNT);
+        for _ in 0..query_count {
+            let key_index = rand::thread_rng().random_range(0..test_key_count);
             if tree.get(keys[key_index].as_slice()).unwrap().is_some() {
                 found += 1;
             }
         }
         let read_duration = read_start.elapsed();
 
-        let find_rate = found as f64 / QUERY_COUNT as f64;
+        let find_rate = found as f64 / query_count as f64;
         println!("读取性能: {:.0} queries/sec",
-                 QUERY_COUNT as f64 / read_duration.as_secs_f64());
+                 query_count as f64 / read_duration.as_secs_f64());
         println!("查找成功率: {:.2}%", find_rate * 100.0);
 
         // 范围查询性能测试
         let range_start = Instant::now();
         let mut range_count = 0;
-        for _ in 0..100 {
-            let start_key = &keys[rand::thread_rng().random_range(0..TEST_KEY_COUNT)];
+        let range_query_count = (test_key_count / 100).max(10); // 动态调整范围查询次数
+        for _ in 0..range_query_count {
+            let start_key = &keys[rand::thread_rng().random_range(0..test_key_count)];
             let mut iter = tree.range(start_key.as_slice()..);
 
-            for _ in iter.by_ref().take(100) {
+            for _ in iter.by_ref().take(20) { // 减少每次查询的结果数量
                 range_count += 1;
             }
         }
@@ -259,7 +305,8 @@ mod optimization_tests {
         // 前缀查询性能测试
         let prefix_start = Instant::now();
         let mut prefix_count = 0;
-        for i in 0..100 {
+        let prefix_query_count = (test_key_count / 1000).max(5); // 动态调整前缀查询次数
+        for i in 0..prefix_query_count {
             let prefix = format!("user_{}_", i);
             let mut iter = tree.scan_prefix(&prefix);
 
@@ -275,6 +322,13 @@ mod optimization_tests {
         println!("========================================");
         println!("综合性能测试完成");
         println!("========================================");
+
+        // 清理测试数据库
+        drop(tree);
+        drop(db);
+        if db_path.exists() {
+            std::fs::remove_dir_all(&db_path).unwrap();
+        }
     }
 
     /// 内存使用量测试
@@ -287,8 +341,10 @@ mod optimization_tests {
             .map(|_| vec![0u8; 512]) // 512字节值
             .collect();
 
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("memory_test");
+        let db_path = std::path::PathBuf::from("memory_usage_perf_test_db");
+        if db_path.exists() {
+            std::fs::remove_dir_all(&db_path).unwrap();
+        }
 
         let db: Db<1024> = Config::new()
             .path(&db_path)
@@ -330,6 +386,13 @@ mod optimization_tests {
         println!("平均每项内存: {:.2} bytes", bytes_per_item);
         println!("数据密度: {:.2}%",
                  (keys.len() * 512) as f64 / mem_increase as f64 * 100.0);
+
+        // 清理测试数据库
+        drop(tree);
+        drop(db);
+        if db_path.exists() {
+            std::fs::remove_dir_all(&db_path).unwrap();
+        }
     }
 
     // 获取当前进程内存使用量（跨平台实现）

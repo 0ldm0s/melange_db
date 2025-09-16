@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(cargo tree)",
-      "Bash(find /Users/0ldm0s/workspaces/rust -name \"*.rs\" -type f -exec grep -l \"stack_map\" {} ;)"
+      "Bash(find /Users/0ldm0s/workspaces/rust -name \"*.rs\" -type f -exec grep -l \"stack_map\" {} ;)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
