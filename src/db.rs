@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 use crate::*;
-use crate::{debug_log, trace_log, warn_log, error_log, info_log};
+use crate::{debug_log, trace_log, warn_log, error_log, info_log, smart_flush::{SmartFlushScheduler, SmartFlushConfig}};
 
 /// melange_db - 高性能嵌入式数据库
 ///
@@ -333,15 +333,34 @@ impl<const LEAF_FANOUT: usize> Db<LEAF_FANOUT> {
         ret.validate()?;
 
         if let Some(flush_every_ms) = ret.cache.config.flush_every_ms {
-            let spawn_res = std::thread::Builder::new()
-                .name("melange_db_flusher".into())
-                .spawn(move || flusher(cache, shutdown_rx, flush_every_ms));
+            let smart_config = ret.cache.config.smart_flush_config.clone();
 
-            if let Err(e) = spawn_res {
-                return Err(io::Error::other(format!(
-                    "无法为 melange_db 数据库生成 flusher 线程: {:?}",
-                    e
-                )));
+            if smart_config.enabled {
+                // 使用智能flusher
+                let spawn_res = std::thread::Builder::new()
+                    .name("melange_db_smart_flusher".into())
+                    .spawn(move || smart_flusher(cache, shutdown_rx, smart_config));
+
+                if let Err(e) = spawn_res {
+                    return Err(io::Error::other(format!(
+                        "无法为 melange_db 数据库生成智能 flusher 线程: {:?}",
+                        e
+                    )));
+                }
+                info_log!("已启动智能flusher线程");
+            } else {
+                // 使用传统固定间隔flusher
+                let spawn_res = std::thread::Builder::new()
+                    .name("melange_db_flusher".into())
+                    .spawn(move || flusher(cache, shutdown_rx, flush_every_ms));
+
+                if let Err(e) = spawn_res {
+                    return Err(io::Error::other(format!(
+                        "无法为 melange_db 数据库生成 flusher 线程: {:?}",
+                        e
+                    )));
+                }
+                info_log!("已启动传统flusher线程");
             }
         }
         Ok(ret)
@@ -568,6 +587,75 @@ impl<const LEAF_FANOUT: usize> Db<LEAF_FANOUT> {
         trees.insert(collection_id, tree.clone());
 
         Ok(tree)
+    }
+}
+
+/// 智能flusher线程函数
+fn smart_flusher<const LEAF_FANOUT: usize>(
+    cache: ObjectCache<LEAF_FANOUT>,
+    shutdown_signal: mpsc::Receiver<mpsc::Sender<()>>,
+    config: SmartFlushConfig,
+) {
+    let mut scheduler = SmartFlushScheduler::new(config);
+    let stats = scheduler.get_stats();
+
+    let flush = || {
+        let flush_res_res = std::panic::catch_unwind(|| cache.flush());
+        match flush_res_res {
+            Ok(Ok(_)) => {
+                scheduler.notify_flush_completed();
+                return;
+            }
+            Ok(Err(flush_failure)) => {
+                error_log!(
+                    "智能Db flusher 在刷新时遇到错误: {:?}",
+                    flush_failure
+                );
+                cache.set_error(&flush_failure);
+            }
+            Err(panicked) => {
+                error_log!(
+                    "智能Db flusher 在刷新时发生恐慌: {:?}",
+                    panicked
+                );
+                cache.set_error(&io::Error::other(
+                    "智能Db flusher 在刷新时发生恐慌".to_string(),
+                ));
+            }
+        }
+        std::process::abort();
+    };
+
+    loop {
+        let next_delay = scheduler.calculate_next_flush_delay();
+
+        if let Ok(shutdown_sender) = shutdown_signal.recv_timeout(next_delay) {
+            flush();
+
+            cache.set_error(&io::Error::other(
+                "系统已关闭".to_string(),
+            ));
+
+            assert!(cache.is_clean());
+
+            drop(cache);
+
+            if let Err(e) = shutdown_sender.send(()) {
+                error_log!(
+                    "智能Db flusher 无法向请求者确认关闭: {e:?}"
+                );
+            }
+            debug_log!(
+                "智能flush 线程在向请求者发出信号后终止"
+            );
+            return;
+        }
+
+        let before_flush = Instant::now();
+        flush();
+        let flush_duration = before_flush.elapsed();
+
+        debug_log!("智能flush完成，耗时: {:?}", flush_duration);
     }
 }
 

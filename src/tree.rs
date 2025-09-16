@@ -828,6 +828,12 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         // 更新布隆过滤器
         self.cache.bloom_filter_insert(key_ref);
 
+        // 记录写入统计（仅当智能flush启用时）
+        if self.cache.config.smart_flush_config.enabled {
+            let bytes_written = key_ref.len() + value_ivec.len();
+            self.cache.record_write(bytes_written);
+        }
+
         let old_size =
             ret.as_ref().map(|v| key_ref.len() + v.len()).unwrap_or(0);
         let new_size = key_ref.len() + value_ivec.len();
