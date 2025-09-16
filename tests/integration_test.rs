@@ -4,11 +4,11 @@ use std::time::Instant;
 #[test]
 fn test_basic_operations() {
     let config = Config::new()
-        .path("test_basic_db");
+        .path("basic_integration_test_db");
 
     // 确保测试目录干净
-    if std::path::Path::new("test_basic_db").exists() {
-        std::fs::remove_dir_all("test_basic_db").unwrap();
+    if std::path::Path::new("basic_integration_test_db").exists() {
+        std::fs::remove_dir_all("basic_integration_test_db").unwrap();
     }
 
     let db = config.open::<1024>().unwrap();
@@ -38,16 +38,16 @@ fn test_basic_operations() {
     // 清理
     drop(tree);
     drop(db);
-    std::fs::remove_dir_all("test_basic_db").unwrap();
+    std::fs::remove_dir_all("basic_integration_test_db").unwrap();
 }
 
 #[test]
 fn test_concurrent_operations() {
     let config = Config::new()
-        .path("test_concurrent_db");
+        .path("concurrent_integration_test_db");
 
-    if std::path::Path::new("test_concurrent_db").exists() {
-        std::fs::remove_dir_all("test_concurrent_db").unwrap();
+    if std::path::Path::new("concurrent_integration_test_db").exists() {
+        std::fs::remove_dir_all("concurrent_integration_test_db").unwrap();
     }
 
     let db = config.open::<1024>().unwrap();
@@ -69,17 +69,17 @@ fn test_concurrent_operations() {
     // 清理
     drop(tree);
     drop(db);
-    std::fs::remove_dir_all("test_concurrent_db").unwrap();
+    std::fs::remove_dir_all("concurrent_integration_test_db").unwrap();
 }
 
 #[test]
 fn test_flush_scheduler() {
     let config = Config::new()
-        .path("test_flush_db")
+        .path("flush_integration_test_db")
         .flush_every_ms(Some(50));
 
-    if std::path::Path::new("test_flush_db").exists() {
-        std::fs::remove_dir_all("test_flush_db").unwrap();
+    if std::path::Path::new("flush_integration_test_db").exists() {
+        std::fs::remove_dir_all("flush_integration_test_db").unwrap();
     }
 
     let db = config.open::<1024>().unwrap();
@@ -104,17 +104,17 @@ fn test_flush_scheduler() {
     // 清理
     drop(tree);
     drop(db);
-    std::fs::remove_dir_all("test_flush_db").unwrap();
+    std::fs::remove_dir_all("flush_integration_test_db").unwrap();
 }
 
 #[test]
 fn test_incremental_serialization() {
     let config = Config::new()
-        .path("test_incremental_db")
+        .path("incremental_integration_test_db")
         .incremental_serialization_threshold(10);
 
-    if std::path::Path::new("test_incremental_db").exists() {
-        std::fs::remove_dir_all("test_incremental_db").unwrap();
+    if std::path::Path::new("incremental_integration_test_db").exists() {
+        std::fs::remove_dir_all("incremental_integration_test_db").unwrap();
     }
 
     let db = config.open::<1024>().unwrap();
@@ -151,5 +151,5 @@ fn test_incremental_serialization() {
     // 清理
     drop(tree);
     drop(db);
-    std::fs::remove_dir_all("test_incremental_db").unwrap();
+    std::fs::remove_dir_all("incremental_integration_test_db").unwrap();
 }
