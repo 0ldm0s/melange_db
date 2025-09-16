@@ -772,12 +772,9 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
 
         let key_ref = key.as_ref();
 
-        // 使用布隆过滤器进行快速过滤
-        if !self.cache.bloom_filter_contains(key_ref) {
-            // 布隆过滤器判断key不存在，直接返回None
-            // 注意：可能有极小的误判率，但这是可接受的
-            return Ok(None);
-        }
+        // 使用布隆过滤器进行快速过滤（仅用于调试统计）
+        // 注意：布隆过滤器不能用于确定key不存在，只能用于可能的性能优化
+        let _bloom_contains = self.cache.bloom_filter_contains(key_ref);
 
         let leaf_guard = self.leaf_for_key(key_ref)?;
 
@@ -788,11 +785,6 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         }
 
         let result = leaf.get(key_ref).cloned();
-
-        // 如果找到了key，确保它在布隆过滤器中（避免误判）
-        if result.is_some() {
-            self.cache.bloom_filter_insert(key_ref);
-        }
 
         Ok(result)
     }
