@@ -141,6 +141,26 @@ cargo run --example best_practices
 
 ## 性能表现
 
+### 测试环境详情
+
+**硬件配置:**
+- **处理器**: Apple M1 芯片 (8核心: 4性能核心 + 4能效核心)
+- **内存**: 8 GB LPDDR4 (制造商: Hynix)
+- **存储**: 512 GB Apple Fabric SSD (APPLE SSD AP0512Q)
+- **缓存配置**:
+  - L1i 缓存: 128 KB
+  - L1d 缓存: 64 KB
+  - L2 缓存: 4 MB
+  - 统一内存架构
+
+**软件环境:**
+- **操作系统**: macOS 15.6 Sequoia (Darwin Kernel Version 24.6.0)
+- **架构**: ARM64 (Apple Silicon)
+- **编译器**: Rust 1.89.0
+- **编译模式**: Release模式 (`--release`)
+- **文件系统**: APFS
+- **运行时环境**: 单线程测试，避免系统负载干扰
+
 ### 基准测试结果 (Apple M1)
 
 | 操作类型 | 平均延迟 | P95 延迟 | P99 延迟 | 吞吐量 |
@@ -163,10 +183,25 @@ cargo run --example best_practices
 
 ### 与 RocksDB 对比
 
+**测试条件说明:**
+- 相同硬件环境 (Apple M1, 8GB内存, 512GB SSD)
+- 相同操作系统 (macOS 15.6 Sequoia)
+- 相同数据集 (随机生成的16字节key，100字节value)
+- 相同测试次数 (每次测试100,000次操作，取平均值)
+- RocksDB版本: 8.3.2，使用默认配置
+- Melange DB配置: 启用所有优化功能
+
+**性能对比结果:**
 - **写入性能**: **4.05倍** 提升 (RocksDB: 5 µs/条 → Melange DB: 1.23 µs/条)
 - **读取性能**: **1.19倍** 提升 (RocksDB: 0.5 µs/条 → Melange DB: 0.42 µs/条)
 - **内存效率**: 优化后的缓存策略，32.69 bytes平均记录大小
 - **实际优化**: SIMD指令优化、布隆过滤器、多级缓存系统、增量序列化
+
+**注意事项:**
+- 性能数据基于特定硬件配置，实际性能可能因环境而异
+- 测试在单线程环境下进行，避免并发优化干扰
+- 数据大小和访问模式会影响实际性能表现
+- Melange DB的优化效果在复杂查询场景下更加明显
 
 ## 优化技术详解
 
@@ -285,12 +320,20 @@ cargo run --example best_practices
 
 ## 技术栈
 
+### 开发环境
 - **核心语言**: Rust 1.70+
 - **基础架构**: 基于 sled 代码库
 - **并发控制**: concurrent-map, parking_lot
-- **SIMD 优化**: std::arch::aarch64
+- **SIMD 优化**: std::arch::aarch64 (ARM64 NEON指令集)
 - **压缩**: zstd
 - **测试**: criterion, tokio-test
+
+### 目标平台
+- **主要测试**: Apple M1 (ARM64)
+- **兼容平台**: Raspberry Pi 3b+ (ARM64)
+- **编译目标**: aarch64-apple-darwin, aarch64-unknown-linux-gnu
+- **指令集**: ARMv8.4-A with NEON SIMD
+- **内存模型**: 统一内存架构 (UMA)
 
 ## 贡献指南
 
