@@ -9,7 +9,7 @@ repository = "https://github.com/0ldm0s/melange_db"
 homepage = "https://github.com/0ldm0s/melange_db"
 documentation = "https://docs.rs/melange_db"
 readme = "README.md"
-keywords = ["database", "embedded-database", "key-value-store", "performance", "optimization", "arm64", "simd", "bloom-filter", "cache", "low-latency", "b-plus-tree", "concurrent-programming", "memory-management", "storage-engine", "iot-database", "edge-computing", "real-time-database", "caching-layer", "systems-programming", "benchmarking"]
+keywords = ["database", "embedded-database", "key-value-store", "performance", "optimization"]
 categories = ["database-implementations", "concurrency", "data-structures", "development-tools::profiling", "embedded"]
 
 [features]
