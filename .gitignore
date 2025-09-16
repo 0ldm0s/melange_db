@@ -2,3 +2,13 @@
 
 # 开发文档和计划
 sled_optimization_plan.md
+
+# 测试数据库文件
+benchmark_db/
+*_db/
+*_perf_test_*.db/
+
+# 临时测试目录
+tmp_db/
+test_db/
+perf_test_db/
