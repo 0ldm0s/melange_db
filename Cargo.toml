@@ -2,8 +2,8 @@
 name = "melange_db"
 version = "0.1.0"
 edition = "2024"
-authors = ["melange_db contributors"]
-description = "基于sled的高性能嵌入式数据库优化版本"
+authors = ["0ldm0s <oldmos@gmail.com>"]
+description = "基于sled的源码二次开发的高性能嵌入式数据库优化分支版本"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/your-org/melange_db"
 keywords = ["database", "embedded", "performance", "optimization"]
@@ -43,6 +43,7 @@ pagetable = "0.4.5"
 parking_lot = { version = "0.12.1", features = ["arc_lock"] }
 rayon = "1.7.0"
 serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 stack-map = { version = "1.0.5", features = ["serde"] }
 zstd = "0.12.4"
 fnv = "1.0.7"
