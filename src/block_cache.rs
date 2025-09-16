@@ -318,7 +318,8 @@ pub struct TieredBlockCache {
     stats: Arc<RwLock<CacheStats>>,
 }
 
-/// 缓存统计信息
+/// 缓存统计信息（内部实现细节）
+#[doc(hidden)]
 #[derive(Debug, Clone, Default)]
 pub struct CacheStats {
     pub hits: u64,

@@ -261,9 +261,10 @@ impl KeyComparator for SimdComparator {
     }
 }
 
-/// 为[InlineArray]提供SIMD优化的比较
+/// 为[InlineArray]提供SIMD优化的比较（内部实现细节）
 ///
 /// 注意：这需要InlineArray提供访问底层字节的接口
+#[doc(hidden)]
 pub trait SimdOptimizedCompare {
     fn simd_compare(&self, other: &Self) -> Ordering;
     fn simd_equals(&self, other: &Self) -> bool;
