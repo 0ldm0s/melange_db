@@ -510,6 +510,7 @@ dependencies = [
  "rand_distr",
  "rayon",
  "serde",
+ "serde_json",
  "stack-map",
  "tempdir",
  "tempfile",
