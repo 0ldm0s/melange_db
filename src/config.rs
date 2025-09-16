@@ -5,7 +5,7 @@ use std::sync::Arc;
 use fault_injection::{annotate, fallible};
 use tempdir::TempDir;
 
-use crate::Db;
+use crate::{Db, smart_flush::SmartFlushConfig};
 
 macro_rules! builder {
     ($(($name:ident, $t:ty, $desc:expr)),*) => {
@@ -45,6 +45,8 @@ pub struct Config {
     pub flush_thread_count: usize,
     /// 缓存预热策略
     pub cache_warmup_strategy: CacheWarmupStrategy,
+    /// 智能flush策略配置
+    pub smart_flush_config: SmartFlushConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -73,6 +75,7 @@ impl Default for Config {
             incremental_serialization_threshold: 8192,
             flush_thread_count: 2,
             cache_warmup_strategy: CacheWarmupStrategy::Recent,
+            smart_flush_config: SmartFlushConfig::default(),
         }
     }
 }

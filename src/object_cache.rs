@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicPtr, AtomicU64, Ordering};
-use crate::{debug_log, trace_log, warn_log, error_log, info_log};
+use crate::{debug_log, trace_log, warn_log, error_log, info_log, smart_flush::WriteLoadStats};
 use std::time::{Duration, Instant};
 
 use cache_advisor::CacheAdvisor;
@@ -161,6 +161,8 @@ pub struct ObjectCache<const LEAF_FANOUT: usize> {
     // 优化组件
     bloom_filter: Arc<RwLock<BloomFilter>>,
     block_cache: Arc<CacheManager>,
+    // 智能flush统计
+    write_stats: Arc<WriteLoadStats>,
 }
 
 impl<const LEAF_FANOUT: usize> std::panic::RefUnwindSafe
@@ -187,6 +189,7 @@ impl<const LEAF_FANOUT: usize> Clone for ObjectCache<LEAF_FANOUT> {
             read_stats: self.read_stats.clone(),
             bloom_filter: self.bloom_filter.clone(),
             block_cache: self.block_cache.clone(),
+            write_stats: self.write_stats.clone(),
         }
     }
 }
@@ -242,6 +245,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
             ..Default::default()
         };
         let block_cache = Arc::new(CacheManager::new(block_cache_config));
+        let write_stats = Arc::new(WriteLoadStats::new());
 
         let pc = ObjectCache {
             config: config.clone(),
@@ -263,6 +267,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
             read_stats: Arc::default(),
             bloom_filter,
             block_cache,
+            write_stats,
         };
 
         Ok((pc, indices, was_recovered))
@@ -328,6 +333,14 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
 
     pub fn get_block_cache_stats(&self) -> block_cache::CacheStats {
         self.block_cache.stats()
+    }
+
+    pub fn record_write(&self, bytes_written: usize) {
+        self.write_stats.record_write(bytes_written);
+    }
+
+    pub fn get_write_stats(&self) -> Arc<WriteLoadStats> {
+        self.write_stats.clone()
     }
 
     pub fn check_error(&self) -> io::Result<()> {

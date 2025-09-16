@@ -14,6 +14,7 @@
 mod block_checker;
 pub mod block_cache;
 pub mod bloom_filter;
+pub mod smart_flush;
 mod config;
 mod db;
 mod flush_epoch;
