@@ -117,6 +117,15 @@ fn main() -> anyhow::Result<()> {
   - 范围查询
   - 数据清理
 
+### ⚠️ 重要说明
+
+**示例代码优化目标**: 当前示例主要针对 Apple M1 等高端 ARM64 设备优化，配置了较大的缓存（1GB）和适用于高性能场景的参数。
+
+**低端设备优化建议**: 如果您需要在 Intel Celeron J1800 等低端 x86 设备上运行，请参考：
+- **测试文件**: `tests/low_end_x86_perf_test.rs`
+- **专用配置**: 针对 2GB 内存和 SSE2 指令集优化
+- **性能目标**: 写入 9-15 µs/条，读取 2-5 µs/条
+
 ### 运行示例
 
 ```bash
@@ -128,6 +137,26 @@ cargo run --example accurate_timing_demo
 
 # 运行最佳实践示例
 cargo run --example best_practices
+```
+
+### 低端设备配置参考
+
+```rust
+// 针对 Intel Celeron J1800 + 2GB 内存的优化配置
+let mut config = Config::new()
+    .path("low_end_db")
+    .flush_every_ms(None)  // 禁用传统自动flush，使用智能flush
+    .cache_capacity_bytes(32 * 1024 * 1024);  // 32MB缓存，适应2GB内存
+
+// 优化智能flush配置
+config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
+    enabled: true,
+    base_interval_ms: 100,     // 100ms基础间隔
+    min_interval_ms: 30,        // 30ms最小间隔
+    max_interval_ms: 1500,     // 1.5s最大间隔
+    write_rate_threshold: 4000, // 4K ops/sec阈值
+    accumulated_bytes_threshold: 2 * 1024 * 1024, // 2MB累积阈值
+};
 ```
 
 ### 示例亮点
@@ -210,19 +239,25 @@ cargo run --example best_practices
 ### 🎯 配置优化
 
 1. **缓存大小设置**
-   - 小型应用: 256MB - 512MB
-   - 中型应用: 1GB - 2GB
-   - 大型应用: 4GB+
+   - 小型应用/低端设备: 32MB - 256MB
+   - 中型应用: 512MB - 1GB
+   - 大型应用/高性能设备: 2GB - 4GB+
 
 2. **智能 Flush 策略**
    - 启用智能 flush 以平衡性能和数据安全
    - 根据写入负载调整 flush 间隔
    - 设置合理的累积字节阈值
+   - **低端设备优化**: 减少基础间隔，提高频率，降低累积阈值
 
 3. **树的设计**
    - 使用有意义的树名
    - 合理设计键的前缀结构
    - 避免单个树过大
+
+4. **硬件适配建议**
+   - **高端设备 (Apple M1等)**: 使用示例中的1GB缓存配置
+   - **低端设备 (Intel Celeron等)**: 参考 `tests/low_end_x86_perf_test.rs` 配置
+   - **内存受限环境**: 减少缓存大小，优化flush策略，考虑使用增量序列化
 
 ### 📊 性能优化
 
