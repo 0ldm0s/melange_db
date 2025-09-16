@@ -178,12 +178,13 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
 
 - **高端设备表现**: 在Apple M1上达到写入1.23 µs/条，读取0.42 µs/条的优异性能
 - **低端设备优化**: 在Intel Celeron J1800上通过智能flush优化实现写入9.13 µs/条，读取2.56 µs/条
+- **低功耗设备适配**: 在树莓派3B+上实现写入39.04 µs/条，读取9.06 µs/条，成功适配1GB内存+SD卡存储环境
 - **对比优势**: 相比RocksDB最高提升4倍写入性能
 - **跨平台支持**: 优化了ARM64和x86_64架构的性能表现
 
 ### 测试覆盖
 
-- **硬件多样性**: 从高端Apple M1到低端Intel Celeron的完整测试覆盖
+- **硬件多样性**: 从高端Apple M1、低端Intel Celeron到树莓派3B+的完整测试覆盖
 - **系统兼容**: macOS和Linux多平台验证
 - **优化验证**: SIMD指令集、智能flush、缓存策略等多维度优化效果验证
 - **持续测试**: 定期性能回归测试确保性能稳定性
@@ -248,6 +249,7 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
    - 根据写入负载调整 flush 间隔
    - 设置合理的累积字节阈值
    - **低端设备优化**: 减少基础间隔，提高频率，降低累积阈值
+   - **树莓派3B+特殊优化**: 增加flush间隔到200ms，降低写入阈值到2000 ops/sec，适应SD卡存储特性
 
 3. **树的设计**
    - 使用有意义的树名
@@ -257,6 +259,7 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
 4. **硬件适配建议**
    - **高端设备 (Apple M1等)**: 使用示例中的1GB缓存配置
    - **低端设备 (Intel Celeron等)**: 参考 `tests/low_end_x86_perf_test.rs` 配置
+   - **树莓派3B+等低功耗ARM设备**: 参考 `tests/raspberry_pi_perf_test.rs` 配置
    - **内存受限环境**: 减少缓存大小，优化flush策略，考虑使用增量序列化
 
 ### 📊 性能优化
@@ -349,7 +352,7 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
 
 ## 许可证
 
-本项目采用 GNU Lesser General Public License v3.0 (LGPLv3) 许可证 - 查看 [COPYING.LESSER](COPYING.LESSER) 文件了解详情。
+本项目采用 GNU Lesser General Public License v3.0 (LGPLv3) 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ### 许可证说明
 
