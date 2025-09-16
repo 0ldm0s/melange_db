@@ -3,11 +3,14 @@ name = "melange_db"
 version = "0.1.0"
 edition = "2024"
 authors = ["0ldm0s <oldmos@gmail.com>"]
-description = "基于 sled 架构深度优化的下一代高性能嵌入式数据库"
+description = "基于 sled 架构深度优化的下一代高性能嵌入式数据库，支持 ARM64 NEON SIMD 优化、多级缓存和布隆过滤器"
 license = "LGPL-3.0"
 repository = "https://github.com/0ldm0s/melange_db"
-keywords = ["database", "embedded", "performance", "optimization"]
-categories = ["database-implementations", "concurrency", "data-structures"]
+homepage = "https://github.com/0ldm0s/melange_db"
+documentation = "https://docs.rs/melange_db"
+readme = "README.md"
+keywords = ["database", "embedded-database", "key-value-store", "performance", "optimization", "arm64", "simd", "bloom-filter", "cache", "low-latency", "b-plus-tree", "concurrent-programming", "memory-management", "storage-engine", "iot-database", "edge-computing", "real-time-database", "caching-layer", "systems-programming", "benchmarking"]
+categories = ["database-implementations", "concurrency", "data-structures", "development-tools::profiling", "embedded"]
 
 [features]
 # 初始化已分配的内存为0xa1，在释放前将0xde写入已释放的内存
