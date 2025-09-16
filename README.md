@@ -141,74 +141,35 @@ cargo run --example best_practices
 
 ## 性能表现
 
-### 测试环境详情
+### 性能测试数据
 
-**硬件配置:**
-- **处理器**: Apple M1 芯片 (8核心: 4性能核心 + 4能效核心)
-- **内存**: 8 GB LPDDR4 (制造商: Hynix)
-- **存储**: 512 GB Apple Fabric SSD (APPLE SSD AP0512Q)
-- **缓存配置**:
-  - L1i 缓存: 128 KB
-  - L1d 缓存: 64 KB
-  - L2 缓存: 4 MB
-  - 统一内存架构
+详细的性能测试数据和硬件环境信息请查看：[docs/test_data/index.md](docs/test_data/index.md)
 
-**软件环境:**
-- **操作系统**: macOS 15.6 Sequoia (Darwin Kernel Version 24.6.0)
-- **架构**: ARM64 (Apple Silicon)
-- **编译器**: Rust 1.89.0
-- **编译模式**: Release模式 (`--release`)
-- **文件系统**: APFS
-- **运行时环境**: 单线程测试，避免系统负载干扰
+### 性能亮点
 
-### 基准测试结果 (Apple M1)
+- **高端设备表现**: 在Apple M1上达到写入1.23 µs/条，读取0.42 µs/条的优异性能
+- **低端设备优化**: 在Intel Celeron J1800上通过智能flush优化实现写入9.13 µs/条，读取2.56 µs/条
+- **对比优势**: 相比RocksDB最高提升4倍写入性能
+- **跨平台支持**: 优化了ARM64和x86_64架构的性能表现
 
-| 操作类型 | 平均延迟 | P95 延迟 | P99 延迟 | 吞吐量 |
-|---------|---------|---------|---------|--------|
-| **单条插入** | 0.78 µs | 1.54 µs | 7.17 µs | 1.28M ops/sec |
-| **单条读取** | 0.37 µs | 0.42 µs | 1.21 µs | 2.70M ops/sec |
-| **批量插入** | 1.40 µs | - | - | 714K ops/sec |
-| **更新操作** | 2.22 µs | - | - | 450K ops/sec |
+### 测试覆盖
 
-### Release模式实测性能
-
-| 操作类型 | 平均延迟 | 吞吐量 |
-|---------|---------|--------|
-| **单条插入** | 9.92 µs | 100.8K ops/sec |
-| **单条读取** | 0.63 µs | 1.59M ops/sec |
-| **批量插入** | 1.22 µs/op | 819.7K ops/sec |
-| **批量读取** | 0.47 µs/op | 2.15M ops/sec |
-| **高性能写入** | 1.23 µs/op | 810.2K ops/sec |
-| **高性能读取** | 0.42 µs/op | 2.37M ops/sec |
-
-### 与 RocksDB 对比
-
-**测试条件说明:**
-- 相同硬件环境 (Apple M1, 8GB内存, 512GB SSD)
-- 相同操作系统 (macOS 15.6 Sequoia)
-- 相同数据集 (随机生成的16字节key，100字节value)
-- 相同测试次数 (每次测试100,000次操作，取平均值)
-- RocksDB版本: 8.3.2，使用默认配置
-- Melange DB配置: 启用所有优化功能
-
-**性能对比结果:**
-- **写入性能**: **4.05倍** 提升 (RocksDB: 5 µs/条 → Melange DB: 1.23 µs/条)
-- **读取性能**: **1.19倍** 提升 (RocksDB: 0.5 µs/条 → Melange DB: 0.42 µs/条)
-- **内存效率**: 优化后的缓存策略，32.69 bytes平均记录大小
-- **实际优化**: SIMD指令优化、布隆过滤器、多级缓存系统、增量序列化
-
-**注意事项:**
-- 性能数据基于特定硬件配置，实际性能可能因环境而异
-- 测试在单线程环境下进行，避免并发优化干扰
-- 数据大小和访问模式会影响实际性能表现
-- Melange DB的优化效果在复杂查询场景下更加明显
+- **硬件多样性**: 从高端Apple M1到低端Intel Celeron的完整测试覆盖
+- **系统兼容**: macOS和Linux多平台验证
+- **优化验证**: SIMD指令集、智能flush、缓存策略等多维度优化效果验证
+- **持续测试**: 定期性能回归测试确保性能稳定性
 
 ## 优化技术详解
 
 ### 1. SIMD 优化
-- **ARM64 NEON 指令集**: 支持 Apple M1 和树莓派 3b+
-- **16 字节对齐比较**: 284M comparisons/sec
-- **批量处理优化**: 支持批量 key 比较操作
+- **多平台支持**: 同时支持 ARM64 NEON 和 x86_64 SSE2/AVX2 指令集
+- **ARM64 NEON**: 支持 Apple M1 和树莓派 3b+ 等ARM64设备
+- **x86_64 SSE2**: 支持Intel Celeron等不支持AVX2的低端x86设备
+- **x86_64 AVX2**: 支持现代Intel/AMD处理器，32字节向量处理
+- **自适应检测**: 运行时自动检测CPU支持的指令集并选择最优实现
+- **小key优化**: 针对≤16字节的key使用快速64位整数比较
+- **批量处理**: 支持批量key比较操作，提升缓存命中率
+- **降级策略**: 不支持SIMD时使用优化的标量比较算法
 
 ### 2. 布隆过滤器
 - **多级过滤器**: 支持热/温/冷数据分层
@@ -324,16 +285,22 @@ cargo run --example best_practices
 - **核心语言**: Rust 1.70+
 - **基础架构**: 基于 sled 代码库
 - **并发控制**: concurrent-map, parking_lot
-- **SIMD 优化**: std::arch::aarch64 (ARM64 NEON指令集)
+- **SIMD 优化**:
+  - std::arch::aarch64 (ARM64 NEON指令集)
+  - std::arch::x86_64 (x86_64 SSE2/AVX2指令集)
 - **压缩**: zstd
 - **测试**: criterion, tokio-test
 
 ### 目标平台
-- **主要测试**: Apple M1 (ARM64)
-- **兼容平台**: Raspberry Pi 3b+ (ARM64)
-- **编译目标**: aarch64-apple-darwin, aarch64-unknown-linux-gnu
-- **指令集**: ARMv8.4-A with NEON SIMD
-- **内存模型**: 统一内存架构 (UMA)
+- **ARM64平台**: Apple M1, Raspberry Pi 3b+ 等ARM64设备
+- **x86_64平台**: Intel/AMD处理器，从低端到高端全覆盖
+- **编译目标**:
+  - aarch64-apple-darwin, aarch64-unknown-linux-gnu
+  - x86_64-apple-darwin, x86_64-unknown-linux-gnu
+- **指令集支持**:
+  - ARM64: ARMv8.4-A with NEON SIMD
+  - x86_64: SSE2 (基础), AVX2 (现代处理器)
+- **运行时检测**: 自动检测CPU特性并选择最优SIMD实现
 
 ## 贡献指南
 
