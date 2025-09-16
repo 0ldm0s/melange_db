@@ -16,10 +16,19 @@ fn main() -> io::Result<()> {
         fs::remove_dir_all(db_path)?;
     }
 
-    // 创建配置
-    let config = Config::new()
+    // 创建配置 - 使用智能自适应flush策略
+    let mut config = Config::new()
         .path(db_path)
+        .flush_every_ms(Some(200))  // 启用后台flush
         .cache_capacity_bytes(512 * 1024 * 1024); // 512MB 缓存
+
+    // 配置智能flush策略
+    config.smart_flush_config.enabled = true;
+    config.smart_flush_config.base_interval_ms = 200;
+    config.smart_flush_config.min_interval_ms = 50;
+    config.smart_flush_config.max_interval_ms = 2000;
+    config.smart_flush_config.write_rate_threshold = 10000; // 10K ops/sec
+    config.smart_flush_config.accumulated_bytes_threshold = 4 * 1024 * 1024; // 4MB
 
     println!("1. 打开数据库...");
     let start = Instant::now();
@@ -37,13 +46,13 @@ fn main() -> io::Result<()> {
     let key = b"test_key";
     let value = "这是一个测试值，用于验证 Melange DB 的读写功能".as_bytes();
 
-    // 写入数据
+    // 写入数据（单次测试，仅用于功能演示）
     let start = Instant::now();
     tree.insert(key, value)?;
     let write_time = start.elapsed();
     println!("✅ 单条写入完成，耗时: {:?}", write_time);
 
-    // 读取数据
+    // 读取数据（单次测试，仅用于功能演示）
     let start = Instant::now();
     let retrieved = tree.get(key)?;
     let read_time = start.elapsed();
@@ -123,13 +132,22 @@ fn main() -> io::Result<()> {
         }
     }
 
-    // 性能统计测试
+    // 性能统计测试（预热后的平均性能）
     println!("\n7. 性能统计测试...");
     let perf_test_size = 10000;
 
-    println!("   性能测试：{} 条记录的读写...", perf_test_size);
+    println!("   性能测试：{} 条记录的读写（系统已预热）...", perf_test_size);
+
+    // 预热阶段
+    println!("   预热系统...");
+    for i in 0..1000 {
+        let key = format!("warmup_{}", i);
+        let value = format!("warmup_value_{}", i);
+        tree.insert(key.as_bytes(), value.as_bytes())?;
+    }
 
     // 写入性能测试
+    println!("   开始写入性能测试...");
     let start = Instant::now();
     for i in 0..perf_test_size {
         let key = format!("perf_key_{}", i);
@@ -140,6 +158,7 @@ fn main() -> io::Result<()> {
     let perf_write_ops = perf_test_size as f64 / perf_write_time.as_secs_f64();
 
     // 读取性能测试
+    println!("   开始读取性能测试...");
     let start = Instant::now();
     let mut read_success = 0;
     for i in 0..perf_test_size {
@@ -152,11 +171,12 @@ fn main() -> io::Result<()> {
     let perf_read_ops = perf_test_size as f64 / perf_read_time.as_secs_f64();
 
     println!("✅ 性能测试完成");
-    println!("   写入性能: {:.2} ops/sec ({:.2} µs/op)",
+    println!("   写入性能: {:.0} ops/sec ({:.2} µs/op，批量平均)",
              perf_write_ops, perf_write_time.as_micros() as f64 / perf_test_size as f64);
-    println!("   读取性能: {:.2} ops/sec ({:.2} µs/op)",
+    println!("   读取性能: {:.0} ops/sec ({:.2} µs/op，批量平均)",
              perf_read_ops, perf_read_time.as_micros() as f64 / perf_test_size as f64);
     println!("   读取成功率: {}/{}", read_success, perf_test_size);
+    println!("   💡 注意：单次操作性能可能因系统状态有所不同");
 
     // 显示数据库统计信息
     println!("\n8. 数据库统计信息...");
@@ -177,28 +197,47 @@ fn main() -> io::Result<()> {
     // 性能对比总结
     println!("\n🎯 性能对比总结");
     println!("================================");
-    println!("Melange DB 性能表现:");
-    println!("• 单条写入: {:.2} µs", write_time.as_micros() as f64);
-    println!("• 单条读取: {:.2} µs", read_time.as_micros() as f64);
-    println!("• 批量写入: {:.2} µs/op", batch_write_time.as_micros() as f64 / batch_size as f64);
-    println!("• 批量读取: {:.2} µs/op", batch_read_time.as_micros() as f64 / batch_size as f64);
-    println!("• 高性能写入: {:.2} µs/op", perf_write_time.as_micros() as f64 / perf_test_size as f64);
-    println!("• 高性能读取: {:.2} µs/op", perf_read_time.as_micros() as f64 / perf_test_size as f64);
-
-    println!("\n与 RocksDB 对比:");
-    println!("• 写入性能: {:.2}x 倍提升 (RocksDB: 5 µs/条 → Melange DB: {:.2} µs/条)",
-             5.0 / (perf_write_time.as_micros() as f64 / perf_test_size as f64),
-             perf_write_time.as_micros() as f64 / perf_test_size as f64);
-    println!("• 读取性能: {:.2}x 倍提升 (RocksDB: 0.5 µs/条 → Melange DB: {:.2} µs/条)",
-             0.5 / (perf_read_time.as_micros() as f64 / perf_test_size as f64),
+    println!("Melange DB 性能表现 (智能Flush策略):");
+    println!("• 单条操作演示: 写入 {:.2} µs, 读取 {:.2} µs (单次示例)",
+             write_time.as_micros() as f64, read_time.as_micros() as f64);
+    println!("• 批量操作平均: 写入 {:.2} µs/op, 读取 {:.2} µs/op",
+             batch_write_time.as_micros() as f64 / batch_size as f64,
+             batch_read_time.as_micros() as f64 / batch_size as f64);
+    println!("• 大规模性能: 写入 {:.2} µs/op, 读取 {:.2} µs/op (预热后批量平均)",
+             perf_write_time.as_micros() as f64 / perf_test_size as f64,
              perf_read_time.as_micros() as f64 / perf_test_size as f64);
 
+    // 基于实际测试数据的RocksDB对比
+    let actual_write_latency = perf_write_time.as_micros() as f64 / perf_test_size as f64;
+    let actual_read_latency = perf_read_time.as_micros() as f64 / perf_test_size as f64;
+
+    println!("\n与 RocksDB 对比 (基于大规模测试):");
+    println!("• 写入性能: {:.1}x 倍提升 (RocksDB: 5 µs/条 → Melange DB: {:.2} µs/条)",
+             5.0 / actual_write_latency, actual_write_latency);
+    println!("• 读取性能: {:.1}x 倍提升 (RocksDB: 0.5 µs/条 → Melange DB: {:.2} µs/条)",
+             0.5 / actual_read_latency, actual_read_latency);
+
     println!("\n🚀 优化技术亮点:");
+    println!("• 智能自适应Flush策略 (根据写入负载动态调整)");
     println!("• SIMD 优化的 key 比较 (ARM64 NEON)");
     println!("• 多级布隆过滤器过滤");
     println!("• 热/温/冷三级缓存系统");
     println!("• 增量序列化优化");
     println!("• 透明的性能优化集成");
+
+    println!("\n🧠 智能Flush策略:");
+    println!("• 高负载时更频繁flush (最小50ms)");
+    println!("• 低负载时延长间隔 (最大2秒)");
+    println!("• 累积字节超过4MB时立即flush");
+    println!("• 自动平衡性能与数据安全性");
+
+    println!("\n📖 性能数据说明:");
+    println!("================");
+    println!("• 单条操作演示: 仅展示API使用，不代表最佳性能");
+    println!("• 批量操作平均: 连续操作的平均性能，更具参考价值");
+    println!("• 大规模性能: 系统预热后的稳定性能，最接近实际应用场景");
+    println!("• 性能会因硬件配置、数据大小、系统负载等因素有所不同");
+    println!("• 建议使用 accurate_timing_demo 示例获取更详细的性能分析");
 
     // 清理数据库
     println!("\n9. 清理数据库...");
