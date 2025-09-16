@@ -2,6 +2,12 @@
 
 ## 测试记录
 
+### 2025年9月16日 - 树莓派3B+性能测试
+- **文件**: [2025-09-16_raspberry_pi_3b_plus_performance_test.md](2025-09-16_raspberry_pi_3b_plus_performance_test.md)
+- **硬件**: ARM Cortex-A53 / 1GB内存 / Raspberry Pi OS
+- **测试内容**: 针对低功耗ARM设备的适配优化测试
+- **主要结果**: 写入39.04 µs/条，读取9.06 µs/条，成功适配低资源环境
+
 ### 2025年9月16日 - 低端x86设备性能测试
 - **文件**: [2025-09-16_low_end_x86_performance_test.md](2025-09-16_low_end_x86_performance_test.md)
 - **硬件**: Intel Celeron J1800 / 2GB内存 / Debian 12
@@ -20,6 +26,7 @@
 |---------|---------|---------|---------|
 | **Apple M1** | 1.23 µs/条 | 0.42 µs/条 | 高端ARM，SIMD优化 |
 | **Intel Celeron J1800** | 9.13 µs/条 | 2.56 µs/条 | 低端x86，智能flush优化 |
+| **树莓派3B+** | 39.04 µs/条 | 9.06 µs/条 | 低功耗ARM，存储适配优化 |
 
 ## 测试环境说明
 所有测试均在真实硬件环境下进行，记录了完整的硬件配置、测试参数和性能指标。测试结果用于指导Melange DB在不同硬件配置下的优化工作。
