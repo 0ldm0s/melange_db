@@ -1,16 +1,21 @@
 //! SIMD优化的key比较模块
 //!
-//! 此模块提供了针对ARM64平台的SIMD优化的key比较操作，
-//! 支持Apple M1和树莓派3b+等ARM64设备。
+//! 此模块提供了针对不同平台的SIMD优化的key比较操作，
+//! 支持ARM64 NEON和x86_64 SSE2/AVX2指令集。
 //!
 //! 主要优化：
-//! - NEON指令集优化
+//! - NEON/SSE2/AVX2指令集优化
 //! - 分支预测优化
 //! - 缓存友好的内存访问模式
 //! - 自适应比较策略
 
 use std::cmp::Ordering;
+
+#[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
+
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 /// SIMD优化的key比较器
 pub struct SimdComparator;
@@ -81,7 +86,32 @@ impl SimdComparator {
     /// SIMD优化的比较（> 16字节）
     #[inline(always)]
     unsafe fn compare_simd(a: &[u8], b: &[u8], len: usize) -> Ordering {
-        // 使用16字节的NEON寄存器进行比较
+        #[cfg(target_arch = "aarch64")]
+        {
+            Self::compare_simd_neon(a, b, len)
+        }
+
+        #[cfg(target_arch = "x86_64")]
+        {
+            if is_x86_feature_detected!("avx2") {
+                Self::compare_simd_avx2(a, b, len)
+            } else if is_x86_feature_detected!("sse2") {
+                Self::compare_simd_sse2(a, b, len)
+            } else {
+                Self::compare_simd_fallback(a, b, len)
+            }
+        }
+
+        #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+        {
+            Self::compare_simd_fallback(a, b, len)
+        }
+    }
+
+    /// ARM64 NEON SIMD比较
+    #[cfg(target_arch = "aarch64")]
+    #[inline(always)]
+    unsafe fn compare_simd_neon(a: &[u8], b: &[u8], len: usize) -> Ordering {
         let simd_chunks = len / 16;
         let remainder = len % 16;
 
@@ -114,40 +144,81 @@ impl SimdComparator {
             }
         }
 
-        // 如果前len字节都相等，比较长度
         a.len().cmp(&b.len())
     }
 
-    /// SIMD优化的相等比较
-    ///
-    /// 此函数专门用于相等性检查，比通用比较更快
-    #[inline(always)]
-    pub fn equals(a: &[u8], b: &[u8]) -> bool {
-        if a.len() != b.len() {
-            return false;
+    /// x86_64 AVX2 SIMD比较
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "avx2")]
+    unsafe fn compare_simd_avx2(a: &[u8], b: &[u8], len: usize) -> Ordering {
+        let simd_chunks = len / 32;
+        let remainder = len % 32;
+
+        for i in 0..simd_chunks {
+            let offset = i * 32;
+            let a_vec = unsafe { _mm256_loadu_si256(a.as_ptr().add(offset) as *const __m256i) };
+            let b_vec = unsafe { _mm256_loadu_si256(b.as_ptr().add(offset) as *const __m256i) };
+
+            // 比较两个向量
+            let eq_mask = _mm256_cmpeq_epi8(a_vec, b_vec);
+            let eq_mask_bits = _mm256_movemask_epi8(eq_mask);
+
+            // 如果所有字节都相等，eq_mask_bits将是全1
+            if eq_mask_bits != -1 {
+                // 找到第一个不同的字节位置
+                let first_diff = eq_mask_bits.trailing_zeros() as usize;
+                return a[offset + first_diff].cmp(&b[offset + first_diff]);
+            }
         }
 
-        let len = a.len();
-
-        // 对于小key，使用快速路径
-        if len <= 16 {
-            return Self::equals_small(a, b);
+        // 处理剩余字节
+        for i in (simd_chunks * 32)..len {
+            if a[i] != b[i] {
+                return a[i].cmp(&b[i]);
+            }
         }
 
-        // 使用SIMD进行比较
-        unsafe {
-            Self::equals_simd(a, b, len)
-        }
+        a.len().cmp(&b.len())
     }
 
-    /// 小key的快速相等比较
+    /// x86_64 SSE2 SIMD比较
+    #[cfg(target_arch = "x86_64")]
+    #[target_feature(enable = "sse2")]
+    unsafe fn compare_simd_sse2(a: &[u8], b: &[u8], len: usize) -> Ordering {
+        let simd_chunks = len / 16;
+        let remainder = len % 16;
+
+        for i in 0..simd_chunks {
+            let offset = i * 16;
+            let a_vec = unsafe { _mm_loadu_si128(a.as_ptr().add(offset) as *const __m128i) };
+            let b_vec = unsafe { _mm_loadu_si128(b.as_ptr().add(offset) as *const __m128i) };
+
+            // 比较两个向量
+            let eq_mask = _mm_cmpeq_epi8(a_vec, b_vec);
+            let eq_mask_bits = _mm_movemask_epi8(eq_mask);
+
+            // 如果所有字节都相等，eq_mask_bits将是全1
+            if eq_mask_bits != 0xFFFF {
+                // 找到第一个不同的字节位置
+                let first_diff = eq_mask_bits.trailing_zeros() as usize;
+                return a[offset + first_diff].cmp(&b[offset + first_diff]);
+            }
+        }
+
+        // 处理剩余字节
+        for i in (simd_chunks * 16)..len {
+            if a[i] != b[i] {
+                return a[i].cmp(&b[i]);
+            }
+        }
+
+        a.len().cmp(&b.len())
+    }
+
+    /// 降级比较（不支持SIMD时使用）
     #[inline(always)]
-    fn equals_small(a: &[u8], b: &[u8]) -> bool {
-        debug_assert_eq!(a.len(), b.len());
-
-        let len = a.len();
-
-        // 使用64位整数比较
+    unsafe fn compare_simd_fallback(a: &[u8], b: &[u8], len: usize) -> Ordering {
+        // 使用64位整数批量比较
         let chunks = len / 8;
         let remainder = len % 8;
 
@@ -163,49 +234,36 @@ impl SimdComparator {
             ]);
 
             if a_chunk != b_chunk {
-                return false;
+                // 找到第一个不同的字节
+                for j in 0..8 {
+                    let byte_a = a[offset + j];
+                    let byte_b = b[offset + j];
+                    if byte_a != byte_b {
+                        return byte_a.cmp(&byte_b);
+                    }
+                }
             }
         }
 
         // 处理剩余字节
         for i in (chunks * 8)..len {
             if a[i] != b[i] {
-                return false;
+                return a[i].cmp(&b[i]);
             }
         }
 
-        true
+        a.len().cmp(&b.len())
     }
 
     /// SIMD优化的相等比较
+    ///
+    /// 此函数专门用于相等性检查，比通用比较更快
     #[inline(always)]
-    unsafe fn equals_simd(a: &[u8], b: &[u8], len: usize) -> bool {
-        let simd_chunks = len / 16;
-        let remainder = len % 16;
-
-        for i in 0..simd_chunks {
-            let offset = i * 16;
-            let a_vec = vld1q_u8(a.as_ptr().add(offset));
-            let b_vec = vld1q_u8(b.as_ptr().add(offset));
-
-            // 比较两个向量
-            let eq_mask = vceqq_u8(a_vec, b_vec);
-
-            // 如果任何字节不相等，eq_mask将不是全1
-            if vminvq_u8(eq_mask) != 0xFF {
-                return false;
-            }
-        }
-
-        // 处理剩余字节
-        for i in (simd_chunks * 16)..len {
-            if a[i] != b[i] {
-                return false;
-            }
-        }
-
-        true
+    pub fn equals(a: &[u8], b: &[u8]) -> bool {
+        Self::compare(a, b) == Ordering::Equal
     }
+
+    
 
     /// 批量key比较优化
     ///
@@ -213,30 +271,60 @@ impl SimdComparator {
     pub fn batch_compare(target: &[u8], keys: &[&[u8]]) -> Vec<Ordering> {
         let mut results = Vec::with_capacity(keys.len());
 
-        // 预取第一个key的缓存行
-        if let Some(first_key) = keys.first() {
-            unsafe {
-                std::arch::asm!(
-                    "prfm pldl1keep, [{0}]",
-                    in(reg) first_key.as_ptr(),
-                    options(nostack)
-                );
-            }
-        }
-
-        for (i, key) in keys.iter().enumerate() {
-            // 预取下一个key的缓存行
-            if i + 1 < keys.len() {
+        // 平台相关的缓存预取
+        #[cfg(target_arch = "aarch64")]
+        {
+            // ARM64缓存预取
+            if let Some(first_key) = keys.first() {
                 unsafe {
                     std::arch::asm!(
                         "prfm pldl1keep, [{0}]",
-                        in(reg) keys[i + 1].as_ptr(),
+                        in(reg) first_key.as_ptr(),
                         options(nostack)
                     );
                 }
             }
 
-            results.push(Self::compare(target, key));
+            for (i, key) in keys.iter().enumerate() {
+                // 预取下一个key的缓存行
+                if i + 1 < keys.len() {
+                    unsafe {
+                        std::arch::asm!(
+                            "prfm pldl1keep, [{0}]",
+                            in(reg) keys[i + 1].as_ptr(),
+                            options(nostack)
+                        );
+                    }
+                }
+
+                results.push(Self::compare(target, key));
+            }
+        }
+
+        #[cfg(target_arch = "x86_64")]
+        {
+            // x86_64缓存预取
+            for key in keys.iter() {
+                unsafe {
+                    std::arch::asm!(
+                        "prefetcht0 [{0}]",
+                        in(reg) key.as_ptr(),
+                        options(nostack)
+                    );
+                }
+            }
+
+            for key in keys.iter() {
+                results.push(Self::compare(target, key));
+            }
+        }
+
+        #[cfg(not(any(target_arch = "aarch64", target_arch = "x86_64")))]
+        {
+            // 其他平台使用普通循环
+            for key in keys.iter() {
+                results.push(Self::compare(target, key));
+            }
         }
 
         results
