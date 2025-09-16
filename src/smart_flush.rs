@@ -34,7 +34,8 @@ impl Default for SmartFlushConfig {
     }
 }
 
-/// 写入负载统计
+/// 写入负载统计（内部实现细节）
+#[doc(hidden)]
 #[derive(Debug)]
 pub struct WriteLoadStats {
     /// 写入操作计数
@@ -111,7 +112,8 @@ impl WriteLoadStats {
     }
 }
 
-/// 智能flush调度器
+/// 智能flush调度器（内部实现细节）
+#[doc(hidden)]
 pub struct SmartFlushScheduler {
     config: SmartFlushConfig,
     stats: Arc<WriteLoadStats>,

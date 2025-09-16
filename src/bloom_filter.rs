@@ -201,7 +201,8 @@ impl BloomFilter {
     }
 }
 
-/// 布隆过滤器统计信息
+/// 布隆过滤器统计信息（内部实现细节）
+#[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct BloomFilterStats {
     pub bit_count: usize,
@@ -329,7 +330,8 @@ pub enum FilterResult {
     MayExistCold,
 }
 
-/// 分层布隆过滤器统计信息
+/// 分层布隆过滤器统计信息（内部实现细节）
+#[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct TieredBloomFilterStats {
     pub hot: BloomFilterStats,

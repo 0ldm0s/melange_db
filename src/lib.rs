@@ -52,12 +52,17 @@ fn debug_delay() {
     }
 }
 
-pub use crate::block_cache::{CacheManager, CacheConfig, AccessPattern};
-pub use crate::bloom_filter::{BloomFilter, ConcurrentBloomFilter, TieredBloomFilter, FilterTier};
 pub use crate::config::{Config, CacheWarmupStrategy};
 pub use crate::db::Db;
-pub use crate::simd_optimized::{SimdComparator, KeyComparator};
 pub use crate::tree::{Batch, Iter, Tree};
+
+// 内部优化实现细节，不应暴露给用户
+#[doc(hidden)]
+pub use crate::block_cache::{CacheManager, CacheConfig, AccessPattern};
+#[doc(hidden)]
+pub use crate::bloom_filter::{BloomFilter, ConcurrentBloomFilter, TieredBloomFilter, FilterTier};
+#[doc(hidden)]
+pub use crate::simd_optimized::{SimdComparator, KeyComparator};
 pub use inline_array::InlineArray;
 
 const NAME_MAPPING_COLLECTION_ID: CollectionId = CollectionId(0);
