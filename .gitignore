@@ -12,3 +12,6 @@ benchmark_db/
 tmp_db/
 test_db/
 perf_test_db/
+
+# Claude Code相关文件
+.claude/
