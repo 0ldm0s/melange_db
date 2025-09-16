@@ -52,7 +52,7 @@ fn main() -> anyhow::Result<()> {
     let db: Db<1024> = config.open()?;
 
     // 写入数据
-    let tree = db.open_tree::<&[u8]>(b"my_tree")?;
+    let tree = db.open_tree("my_tree")?;
     tree.insert(b"key", b"value")?;
 
     // 读取数据
@@ -93,8 +93,8 @@ fn main() -> anyhow::Result<()> {
     let db: Db<1024> = config.open()?;
 
     // 使用有意义的树名
-    let users_tree = db.open_tree::<&[u8]>(b"users")?;
-    let sessions_tree = db.open_tree::<&[u8]>(b"sessions")?;
+    let users_tree = db.open_tree("users")?;
+    let sessions_tree = db.open_tree("sessions")?;
 
     Ok(())
 }
