@@ -11,6 +11,16 @@ use rand::Rng;
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
 
+#[cfg(windows)]
+use std::os::windows::fs::FileExt;
+
+/// 跨平台的read_exact_at实现
+fn read_exact_at_cross_platform(file: &File, buf: &mut [u8], offset: u64) -> io::Result<()> {
+    let mut file = file.try_clone()?;
+    file.seek(SeekFrom::Start(offset))?;
+    file.read_exact(buf)
+}
+
 const TEST_DATA_SIZE: usize = 2 * 1024 * 1024; // 2MB测试数据，适应低内存设备
 const READ_COUNT: usize = 500;
 const BLOCK_SIZE: usize = 4096;
@@ -41,7 +51,7 @@ fn test_traditional_io(file: &File, block_size: usize) -> io::Result<(Duration, 
                 format!("尝试读取超出文件边界: offset={}, block_size={}, file_size={}",
                     offset, block_size, file_size)));
         }
-        file.read_exact_at(&mut buffer, offset)?;
+        read_exact_at_cross_platform(file, &mut buffer, offset)?;
         total_bytes_read += block_size as u64;
     }
 
@@ -287,7 +297,7 @@ mod mmap_performance_tests {
             let offset = rng.random_range(0..(TEST_DATA_SIZE - block_size)) as u64;
 
             let mut buffer = vec![0u8; block_size];
-            if let Ok(_) = file.read_exact_at(&mut buffer, offset) {
+            if let Ok(_) = read_exact_at_cross_platform(&file, &mut buffer, offset) {
                 total_bytes += block_size;
             }
         }
