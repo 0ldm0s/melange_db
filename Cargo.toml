@@ -1,6 +1,6 @@
 [package]
 name = "melange_db"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 authors = ["0ldm0s <oldmos@gmail.com>"]
 description = "基于 sled 架构深度优化的下一代高性能嵌入式数据库，支持 ARM64 NEON SIMD 优化、多级缓存和布隆过滤器"
