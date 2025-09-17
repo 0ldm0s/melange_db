@@ -2,6 +2,10 @@
 
 > 基于 sled 架构深度优化的下一代高性能嵌入式数据库
 
+[![Crates.io](https://img.shields.io/crates/v/melange_db.svg)](https://crates.io/crates/melange_db)
+[![Documentation](https://docs.rs/melange_db/badge.svg)](https://docs.rs/melange_db)
+[![License](https://img.shields.io/badge/license-LGPLv3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0.en.html)
+
 ## 项目简介
 
 Melange DB 是一个基于 sled 架构进行深度性能优化的嵌入式数据库，专注于超越 RocksDB 的性能表现。通过 SIMD 指令优化、智能缓存系统和布隆过滤器等技术，实现极致的读写性能。
