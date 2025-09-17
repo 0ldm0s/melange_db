@@ -16,11 +16,11 @@ macro_rules! debug_log {
     };
 }
 
-/// 追踪级别日志 - 仅在trace级别且debug模式下编译
+/// 追踪级别日志 - 仅在debug模式下编译
 #[macro_export]
 macro_rules! trace_log {
     ($($arg:tt)*) => {
-        #[cfg(all(debug_assertions, feature = "trace-logs"))]
+        #[cfg(debug_assertions)]
         tracing::trace!($($arg)*);
     };
 }
