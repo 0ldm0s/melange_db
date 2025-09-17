@@ -53,7 +53,7 @@ fn debug_delay() {
     }
 }
 
-pub use crate::config::{Config, CacheWarmupStrategy};
+pub use crate::config::{Config, CacheWarmupStrategy, CompressionAlgorithm};
 pub use crate::db::Db;
 pub use crate::tree::{Batch, Iter, Tree};
 

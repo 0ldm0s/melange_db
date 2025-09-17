@@ -21,6 +21,20 @@ for-internal-testing-only = []
 # 禁止重用对象ID和堆槽，禁用树叶子合并，禁用堆文件截断
 monotonic-behavior = []
 
+# 压缩算法特性选择（互斥特性，只能选择一个）
+# 启用zstd压缩，提供高压缩率
+compression-zstd = []
+# 启用lz4压缩，提供更快的压缩速度，适合中等性能设备
+compression-lz4 = []
+# 禁用压缩，提供最佳性能，适合低端设备（如树莓派）
+compression-none = []
+
+# 特性组合验证（防止同时启用多个压缩特性）
+# 如果同时启用多个特性，将使用以下优先级：none > lz4 > zstd
+
+# 默认特性集合 - 不启用压缩以提供最佳性能
+default = []
+
 [profile.release]
 debug = true
 opt-level = 3
@@ -49,6 +63,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 stack-map = { version = "1.0.5", features = ["serde"] }
 zstd = "0.12.4"
+lz4_flex = "0.11"
 fnv = "1.0.7"
 fault-injection = "1.0.10"
 crossbeam-queue = "0.3.8"

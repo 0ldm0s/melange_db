@@ -74,6 +74,95 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
+### 压缩配置
+
+Melange DB 支持通过编译时特性选择压缩算法，以适应不同的性能需求：
+
+#### 无压缩模式（默认，最佳性能）
+```rust
+use melange_db::{Db, Config, CompressionAlgorithm};
+
+fn main() -> anyhow::Result<()> {
+    // 无压缩配置 - 追求极致性能
+    let config = Config::new()
+        .path("/path/to/database")
+        .compression_algorithm(CompressionAlgorithm::None)  // 无压缩
+        .cache_capacity_bytes(512 * 1024 * 1024); // 512MB 缓存
+
+    let db: Db<1024> = config.open()?;
+
+    // 读写操作将获得最佳性能，无压缩开销
+    let tree = db.open_tree("high_performance_tree")?;
+    tree.insert(b"key", b"value")?;
+
+    Ok(())
+}
+```
+
+#### LZ4压缩模式（平衡性能与压缩率）
+```rust
+use melange_db::{Db, Config, CompressionAlgorithm};
+
+fn main() -> anyhow::Result<()> {
+    // LZ4压缩配置 - 平衡性能和存储效率
+    let config = Config::new()
+        .path("/path/to/database")
+        .compression_algorithm(CompressionAlgorithm::Lz4)  // LZ4压缩
+        .cache_capacity_bytes(512 * 1024 * 1024); // 512MB 缓存
+
+    let db: Db<1024> = config.open()?;
+
+    // 获得良好的压缩率，同时保持较高性能
+    let tree = db.open_tree("balanced_tree")?;
+    tree.insert(b"key", b"value")?;
+
+    Ok(())
+}
+```
+
+#### Zstd压缩模式（高压缩率）
+```rust
+use melange_db::{Db, Config, CompressionAlgorithm};
+
+fn main() -> anyhow::Result<()> {
+    // Zstd压缩配置 - 追求最大压缩率
+    let config = Config::new()
+        .path("/path/to/database")
+        .compression_algorithm(CompressionAlgorithm::Zstd)  // Zstd压缩
+        .cache_capacity_bytes(512 * 1024 * 1024); // 512MB 缓存
+
+    let db: Db<1024> = config.open()?;
+
+    // 获得最高的压缩率，适合存储受限场景
+    let tree = db.open_tree("storage_efficient_tree")?;
+    tree.insert(b"key", b"value")?;
+
+    Ok(())
+}
+```
+
+#### 特性选择和验证
+```rust
+use melange_db::config::CompressionAlgorithm;
+
+fn main() -> anyhow::Result<()> {
+    // 检查启用的压缩特性
+    let features = CompressionAlgorithm::detect_enabled_features();
+    println!("启用的压缩特性: {:?}", features);
+
+    // 验证特性配置
+    if let Some(warning) = CompressionAlgorithm::validate_feature_config() {
+        println!("警告: {}", warning);
+    }
+
+    // 获取实际使用的算法
+    let (algorithm, reason) = CompressionAlgorithm::get_active_algorithm_with_reason();
+    println!("使用压缩算法: {:?}, 原因: {}", algorithm, reason);
+
+    Ok(())
+}
+```
+
 ### 最佳实践配置
 
 ```rust
@@ -141,6 +230,11 @@ cargo run --example accurate_timing_demo
 
 # 运行最佳实践示例
 cargo run --example best_practices
+
+# 运行压缩算法性能对比（需要指定压缩特性）
+cargo run --example macbook_air_m1_compression_none --features compression-none --release
+cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release
+cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release
 ```
 
 ### 低端设备配置参考
@@ -310,11 +404,12 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
 - [x] 内存使用优化
 - [x] 智能自适应 flush 策略
 - [x] 完整的示例代码和文档
+- [x] 智能预取算法（基于访问模式）
+- [x] 完整的多平台SIMD支持（ARM64 NEON + x86_64 SSE2/AVX2）
 
 ### 🔄 进行中
-- [ ] 更智能的预取算法
 - [ ] 自适应压缩策略
-- [ ] 更多平台支持 (x86_64 SIMD)
+- [ ] LZ4压缩算法支持（可选，提供更快的压缩速度）
 
 ### 📋 未来规划
 - [ ] 分布式版本
@@ -330,8 +425,54 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
 - **SIMD 优化**:
   - std::arch::aarch64 (ARM64 NEON指令集)
   - std::arch::x86_64 (x86_64 SSE2/AVX2指令集)
-- **压缩**: zstd
+- **压缩**: zstd, lz4_flex（特性可选）
 - **测试**: criterion, tokio-test
+
+### 压缩算法选择（编译时特性）
+
+Melange DB 支持通过编译时特性选择压缩算法，以适应不同的性能需求：
+
+#### 无压缩（默认）
+```bash
+cargo build --release
+```
+- **适用场景**: 低端设备（如树莓派）、追求极致性能
+- **特点**: 零CPU开销，最快读写速度
+
+#### LZ4压缩
+```bash
+cargo build --release --features compression-lz4
+```
+- **适用场景**: 中等性能设备，需要较好的压缩速度和压缩率平衡
+- **特点**: 极快的压缩/解压缩速度，适度压缩率
+
+#### Zstd压缩
+```bash
+cargo build --release --features compression-zstd
+```
+- **适用场景**: 存储空间受限，需要高压缩率
+- **特点**: 高压缩率，但CPU开销相对较大
+
+#### 特性优先级
+如果同时启用多个压缩特性，将按以下优先级选择：**none > lz4 > zstd**
+
+#### 配置验证
+```rust
+use melange_db::config::CompressionAlgorithm;
+
+// 检查启用的压缩特性
+let features = CompressionAlgorithm::detect_enabled_features();
+println!("启用的压缩特性: {:?}", features);
+
+// 验证特性配置
+if let Some(warning) = CompressionAlgorithm::validate_feature_config() {
+    println!("警告: {}", warning);
+}
+
+// 获取实际使用的算法
+let (algorithm, reason) = CompressionAlgorithm::get_active_algorithm_with_reason();
+println!("使用压缩算法: {:?}, 原因: {}", algorithm, reason);
+```
 
 ### 目标平台
 - **ARM64平台**: Apple M1, Raspberry Pi 3b+ 等ARM64设备
