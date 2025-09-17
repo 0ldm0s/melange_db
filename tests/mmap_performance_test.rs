@@ -16,9 +16,7 @@ use std::os::windows::fs::FileExt;
 
 /// 跨平台的read_exact_at实现
 fn read_exact_at_cross_platform(file: &File, buf: &mut [u8], offset: u64) -> io::Result<()> {
-    let mut file = file.try_clone()?;
-    file.seek(SeekFrom::Start(offset))?;
-    file.read_exact(buf)
+    melange_db::platform_utils::read_exact_at(file, buf, offset)
 }
 
 const TEST_DATA_SIZE: usize = 2 * 1024 * 1024; // 2MB测试数据，适应低内存设备

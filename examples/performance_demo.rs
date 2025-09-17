@@ -1,24 +1,25 @@
-use melange_db::{Db, Config};
+use melange_db::{Db, Config, platform_utils};
 use std::time::Instant;
-use std::fs;
 use std::path::Path;
+use std::fs;
 use std::io::{self, Write};
 
 fn main() -> io::Result<()> {
     println!("🪐 Melange DB 性能测试与示例");
     println!("================================");
 
-    // 测试数据路径
-    let db_path = Path::new("example_db");
+    // 使用平台工具获取测试数据库路径
+    let db_path = platform_utils::setup_example_db("performance_demo");
+    println!("🔍 调试: 数据库路径 = {:?}", db_path);
 
-    // 清理旧的数据库
-    if db_path.exists() {
-        fs::remove_dir_all(db_path)?;
-    }
+    // 清理旧的数据库（如果存在）
+    println!("🔍 调试: 开始清理数据库...");
+    platform_utils::cleanup_db_directory(&db_path);
+    println!("🔍 调试: 数据库清理完成");
 
     // 创建配置 - 使用智能自适应flush策略
     let mut config = Config::new()
-        .path(db_path)
+        .path(&db_path)
         .flush_every_ms(Some(200))  // 启用后台flush
         .cache_capacity_bytes(512 * 1024 * 1024); // 512MB 缓存
 
@@ -30,9 +31,22 @@ fn main() -> io::Result<()> {
     config.smart_flush_config.write_rate_threshold = 10000; // 10K ops/sec
     config.smart_flush_config.accumulated_bytes_threshold = 4 * 1024 * 1024; // 4MB
 
+    println!("🔍 调试: 配置创建完成，准备打开数据库...");
+    println!("🔍 调试: 检查路径是否存在: {}", db_path.exists());
+    println!("🔍 调试: 检查路径是否可写: {}", platform_utils::is_path_writable(&db_path));
+
     println!("1. 打开数据库...");
     let start = Instant::now();
-    let db: Db<1024> = config.open()?;
+    let db: Db<1024> = match config.open() {
+        Ok(db) => {
+            println!("🔍 调试: 数据库打开成功！");
+            db
+        }
+        Err(e) => {
+            println!("🔍 调试: 数据库打开失败: {:?}", e);
+            return Err(e);
+        }
+    };
     let open_time = start.elapsed();
     println!("✅ 数据库打开成功，耗时: {:?}", open_time);
 
@@ -244,9 +258,7 @@ fn main() -> io::Result<()> {
     drop(tree);
     drop(db);
 
-    if db_path.exists() {
-        fs::remove_dir_all(db_path)?;
-    }
+    platform_utils::cleanup_db_directory(&db_path);
     println!("✅ 数据库清理完成");
 
     println!("\n🎉 所有测试完成！Melange DB 运行正常！");
