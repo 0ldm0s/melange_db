@@ -6,6 +6,9 @@
 [![Documentation](https://docs.rs/melange_db/badge.svg)](https://docs.rs/melange_db)
 [![License](https://img.shields.io/badge/license-LGPLv3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0.en.html)
 
+## 🌍 语言版本
+- [中文版](README.md) | [English](README_en.md) | [日本語版](README_ja.md)
+
 ## 项目简介
 
 Melange DB 是一个基于 sled 架构进行深度性能优化的嵌入式数据库，专注于超越 RocksDB 的性能表现。通过 SIMD 指令优化、智能缓存系统和布隆过滤器等技术，实现极致的读写性能。
@@ -567,6 +570,10 @@ println!("使用压缩算法: {:?}, 原因: {}", algorithm, reason);
 - ✅ **动态链接**: 推荐的使用方式，主程序保持闭源
 - ✅ **修改贡献**: 对 Melange DB 的改进需要开源
 
----
+## 致谢
+
+- 基于优秀的 [sled](https://github.com/spacejam/sled) 数据库架构
+- 灵感来自弗兰克·赫伯特的《沙丘》宇宙
+- 感谢所有提供反馈和建议的贡献者和用户
 
 > "I must not fear. Fear is the mind-killer." - Frank Herbert, Dune
