@@ -2,6 +2,13 @@
 
 ## 测试记录
 
+### 2025年9月17日 - Surface Book 2性能测试
+- **文件**: [2025-09-17_surface_book_2_performance_test.md](2025-09-17_surface_book_2_performance_test.md)
+- **硬件**: Intel Core i7-8650U / 16GB内存 / Windows 11
+- **测试内容**: 高端移动设备AVX2优化验证测试
+- **主要结果**: 写入3.25 µs/条，读取1.38 µs/条，AVX2指令集确认正常工作
+- **特别提醒**: 测试在高性能电源模式下进行，节能模式性能可能下降
+
 ### 2025年9月16日 - 树莓派3B+性能测试
 - **文件**: [2025-09-16_raspberry_pi_3b_plus_performance_test.md](2025-09-16_raspberry_pi_3b_plus_performance_test.md)
 - **硬件**: ARM Cortex-A53 / 1GB内存 / Raspberry Pi OS
@@ -24,7 +31,8 @@
 
 | 设备类型 | 写入性能 | 读取性能 | 优化特点 |
 |---------|---------|---------|---------|
-| **Apple M1** | 1.23 µs/条 | 0.42 µs/条 | 高端ARM，SIMD优化 |
+| **Apple M1** | 1.23 µs/条 | 0.42 µs/条 | 高端ARM，最佳性能 |
+| **Surface Book 2** | 3.25 µs/条 | 1.38 µs/条 | 高端x86，AVX2优化 |
 | **Intel Celeron J1800** | 9.13 µs/条 | 2.56 µs/条 | 低端x86，智能flush优化 |
 | **树莓派3B+** | 39.04 µs/条 | 9.06 µs/条 | 低功耗ARM，存储适配优化 |
 
