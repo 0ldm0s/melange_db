@@ -25,6 +25,7 @@ mod logging;
 mod metadata_store;
 mod object_cache;
 mod object_location_mapper;
+pub mod platform_utils;
 pub mod simd_optimized;
 mod tree;
 

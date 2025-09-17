@@ -1,7 +1,5 @@
-use melange_db::{Db, Config};
+use melange_db::{Db, Config, platform_utils};
 use std::time::Instant;
-use std::fs;
-use std::path::Path;
 use std::io::{self, Write};
 use serde::{Serialize, Deserialize};
 
@@ -31,16 +29,14 @@ fn main() -> io::Result<()> {
 
     // 1. 配置最佳实践
     println!("1. 数据库配置最佳实践...");
-    let db_path = Path::new("best_practice_db");
+    let db_path = platform_utils::setup_example_db("best_practices");
 
-    // 清理旧的数据库
-    if db_path.exists() {
-        fs::remove_dir_all(db_path)?;
-    }
+    // 清理旧的数据库（如果存在）
+    platform_utils::cleanup_db_directory(&db_path);
 
     // 生产环境推荐配置
     let mut config = Config::new()
-        .path(db_path)
+        .path(&db_path)
         .cache_capacity_bytes(1024 * 1024 * 1024) // 1GB 缓存
         .flush_every_ms(Some(1000)); // 1秒 flush 间隔
 
@@ -320,9 +316,7 @@ fn main() -> io::Result<()> {
     drop(metrics_tree);
     drop(db);
 
-    if db_path.exists() {
-        fs::remove_dir_all(db_path)?;
-    }
+    platform_utils::cleanup_db_directory(&db_path);
     println!("✅ 数据库清理完成");
 
     println!("\n🎉 最佳实践示例完成！");

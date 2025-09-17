@@ -734,18 +734,36 @@ impl Heap {
                     continue;
                 }
             }
-            maybe!(fs::File::open(p).and_then(|f| f.sync_all()))?;
+            // 跨平台的目录同步处理
+        if let Err(e) = crate::platform_utils::sync_directory(p) {
+            return Err(annotate!(e));
+        }
         }
 
         let _ = fs::File::create(path.join(WARN));
 
+        // 跨平台的文件锁定机制
+        let lock_file_path = path.join(".lock");
+
         let mut file_lock_opts = fs::OpenOptions::new();
-        file_lock_opts.create(false).read(false).write(false);
-        let directory_lock = fallible!(fs::File::open(path));
+        file_lock_opts.create(true).read(true).write(true);
+
+        let directory_lock = fallible!(file_lock_opts.open(&lock_file_path));
+
         fallible!(directory_lock.try_lock_exclusive());
 
-        maybe!(fs::File::open(&slabs_dir).and_then(|f| f.sync_all()))?;
-        maybe!(directory_lock.sync_all())?;
+        // 在Windows上，我们只同步锁文件，而不是目录
+        #[cfg(unix)]
+        {
+            // 跨平台的目录同步处理
+        maybe!(crate::platform_utils::sync_directory(&slabs_dir))?;
+            maybe!(directory_lock.sync_all())?;
+        }
+
+        #[cfg(windows)]
+        {
+            maybe!(directory_lock.sync_all())?;
+        }
 
         let persistent_settings =
             PersistentSettings::V1 { leaf_fanout: leaf_fanout as u64 };
@@ -798,7 +816,8 @@ impl Heap {
             })
         }
 
-        maybe!(fs::File::open(&slabs_dir).and_then(|f| f.sync_all()))?;
+        // 跨平台的目录同步处理
+        maybe!(crate::platform_utils::sync_directory(&slabs_dir))?;
 
         debug_log!("recovery of Heap at {:?} complete", path);
 

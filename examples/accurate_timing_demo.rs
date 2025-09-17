@@ -1,21 +1,19 @@
-use melange_db::{Db, Config};
+use melange_db::{Db, Config, platform_utils};
 use std::time::Instant;
-use std::fs;
-use std::path::Path;
 use std::io;
 
 fn main() -> io::Result<()> {
     println!("🔬 Melange DB 精确计时分析");
     println!("================================");
 
-    let db_path = Path::new("accurate_timing_db");
-    if db_path.exists() {
-        fs::remove_dir_all(db_path)?;
-    }
+    let db_path = platform_utils::setup_example_db("accurate_timing");
+
+    // 清理旧的数据库（如果存在）
+    platform_utils::cleanup_db_directory(&db_path);
 
     // 使用智能flush配置
     let mut config = Config::new()
-        .path(db_path)
+        .path(&db_path)
         .flush_every_ms(Some(200))
         .cache_capacity_bytes(512 * 1024 * 1024);
 
@@ -172,9 +170,7 @@ fn main() -> io::Result<()> {
     // 清理
     drop(tree);
     drop(db);
-    if db_path.exists() {
-        fs::remove_dir_all(db_path)?;
-    }
+    platform_utils::cleanup_db_directory(&db_path);
 
     println!("\n✅ 精确计时分析完成！");
     Ok(())

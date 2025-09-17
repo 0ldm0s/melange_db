@@ -293,8 +293,17 @@ impl MetadataStore {
 
         let _ = fs::File::create(path.join(WARN));
 
-        let directory_lock = fallible!(fs::File::open(path));
+        // 跨平台的文件锁定机制
+        let lock_file_path = path.join(".meta_lock");
+
+        let mut file_lock_opts = fs::OpenOptions::new();
+        file_lock_opts.create(true).read(true).write(true);
+
+        let directory_lock = fallible!(file_lock_opts.open(&lock_file_path));
+
+        // 跨平台的同步处理（锁文件总是可以同步）
         fallible!(directory_lock.sync_all());
+
         fallible!(directory_lock.try_lock_exclusive());
 
         let recovery =
