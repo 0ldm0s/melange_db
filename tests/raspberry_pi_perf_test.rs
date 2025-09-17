@@ -5,6 +5,8 @@ use std::time::Instant;
 fn raspberry_pi_3b_plus_performance_test() {
     println!("🚀 开始 melange_db 树莓派3B+性能测试");
     println!("🍓 目标设备: Raspberry Pi 3B+ / ARM Cortex-A53 / 1GB内存 / SD卡存储");
+    println!("⚠️  重要提示: 请使用 --release 模式运行以获得准确的性能数据");
+    println!("   命令: cargo test --release raspberry_pi_3b_plus_performance_test");
 
     // 配置数据库 - 针对树莓派3B+优化的配置
     let mut config = Config::new()

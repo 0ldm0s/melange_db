@@ -5,6 +5,8 @@ use std::time::Instant;
 fn low_end_x86_performance_test() {
     println!("🚀 开始 melange_db 低端x86设备性能测试");
     println!("🖥️  目标设备: Intel Celeron J1800 / 2GB可用内存 / SSE2指令集");
+    println!("⚠️  重要提示: 请使用 --release 模式运行以获得准确的性能数据");
+    println!("   命令: cargo test --release low_end_x86_performance_test");
 
     // 配置数据库 - 针对低端设备优化的配置
     let mut config = Config::new()
