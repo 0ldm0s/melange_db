@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "melange_db"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bincode",
  "cache-advisor",
