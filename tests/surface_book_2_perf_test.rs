@@ -8,6 +8,8 @@ fn surface_book_2_performance_test() {
     println!("💻 目标设备: Microsoft Surface Book 2 (Intel Core i7-8650U / 16GB内存 / Windows 11)");
     println!("💾 设备特点: 4核8线程CPU, 2.11GHz最大频率, 16GB物理内存, 高端移动设备");
     println!("⚠️  重要提醒: 此测试应在Windows高性能电源模式下运行，节能模式可能导致性能显著下降");
+    println!("📊 测试提示: 请使用 --release 模式运行以获得准确的性能数据");
+    println!("   命令: cargo test --release surface_book_2_performance_test");
     println!("🔧 电源检查: 请确保Windows电源选项设置为'高性能'模式以获得最佳测试结果");
     // 配置数据库 - 针对Surface Book 2高端移动设备优化的配置
     let mut config = Config::new()

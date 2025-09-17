@@ -5,6 +5,9 @@
 //! - 布隆过滤器查询性能
 //! - 块缓存命中率
 //! - 整体查询性能
+//!
+//! ⚠️  重要提示: 请使用 --release 模式运行以获得准确的性能数据
+//!    命令: cargo test --release optimization_performance_test
 
 use melange_db::*;
 use std::time::{Duration, Instant};
