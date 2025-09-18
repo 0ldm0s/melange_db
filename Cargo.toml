@@ -32,6 +32,9 @@ compression-none = []
 # 特性组合验证（防止同时启用多个压缩特性）
 # 如果同时启用多个特性，将使用以下优先级：none > lz4 > zstd
 
+# mimalloc内存分配器支持
+mimalloc = ["dep:mimalloc"]
+
 # 默认特性集合 - 不启用压缩以提供最佳性能
 default = []
 
@@ -48,6 +51,7 @@ panic = "abort"
 
 [dependencies]
 bincode = "1.3.3"
+mimalloc = { version = "0.1", optional = true }
 cache-advisor = "1.0.16"
 concurrent-map = { version = "5.0.31", features = ["serde"] }
 crc32fast = "1.3.2"

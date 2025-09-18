@@ -23,9 +23,20 @@ use crate::*;
 // 使用性能优化的日志宏
 use crate::{debug_log, trace_log, warn_log, error_log, info_log};
 
-#[cfg(feature = "for-internal-testing-only")]
-use crate::block_checker::track_blocks;
 
+/// melange_db 的树结构，提供高性能的键值存储操作
+///
+/// `Tree` 是 melange_db 的核心数据结构，提供了类似 B+ 树的功能，
+/// 但针对现代硬件进行了深度优化。主要特性包括：
+///
+/// - 增量序列化减少IO开销
+/// - 优化的缓存策略
+/// - 高效的并发控制
+/// - 智能的flush机制
+///
+/// `LEAF_FANOUT` 参数控制每个叶子节点的键值对数量，
+/// 较高的值（默认1024）提供更好的压缩率，
+/// 较低的值（16-256）可能对大内存随机工作负载更有利
 #[derive(Clone)]
 pub struct Tree<const LEAF_FANOUT: usize = 1024> {
     collection_id: CollectionId,
@@ -214,10 +225,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
     )> {
         let before_read_io = Instant::now();
 
-        #[cfg(feature = "for-internal-testing-only")]
-        let _b0 = track_blocks();
-
-        let mut loops: u64 = 0;
+                let mut loops: u64 = 0;
         let mut last_continue = "none";
         let mut warned = false;
 
@@ -253,10 +261,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 continue;
             }
 
-            #[cfg(feature = "for-internal-testing-only")]
-            let _b1 = track_blocks();
-
-            let mut write = node.inner.write_arc();
+                        let mut write = node.inner.write_arc();
             if write.leaf.is_none() {
                 self.cache
                     .read_stats
@@ -318,15 +323,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                     .sum_deserialization_latency_us
                     .fetch_add(deserialization_latency_us, Ordering::Relaxed);
 
-                #[cfg(feature = "for-internal-testing-only")]
-                {
-                    self.cache.event_verifier.mark(
-                        node.object_id,
-                        FlushEpoch::MIN,
-                        event_verifier::State::CleanPagedIn,
-                        concat!(file!(), ':', line!(), ":page-in"),
-                    );
-                }
+                
 
                 write.leaf = Some(leaf);
             } else {
@@ -407,8 +404,6 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         &'a self,
         mut predecessor: LeafWriteGuard<'a, LEAF_FANOUT>,
     ) -> io::Result<()> {
-        #[cfg(feature = "for-internal-testing-only")]
-        let _b1 = track_blocks();
 
         let mut successor = self.successor_leaf_mut(&predecessor)?;
 
@@ -480,15 +475,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             },
         );
 
-        #[cfg(feature = "for-internal-testing-only")]
-        {
-            self.cache.event_verifier.mark(
-                successor.node.object_id,
-                merge_epoch,
-                event_verifier::State::Unallocated,
-                concat!(file!(), ':', line!(), ":merged"),
-            );
-        }
+        
 
         self.cache.install_dirty(
             merge_epoch,
@@ -500,15 +487,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             },
         );
 
-        #[cfg(feature = "for-internal-testing-only")]
-        {
-            self.cache.event_verifier.mark(
-                predecessor.node.object_id,
-                merge_epoch,
-                event_verifier::State::Dirty,
-                concat!(file!(), ':', line!(), ":merged-into"),
-            );
-        }
+        
 
         let (p_object_id, p_sz) =
             predecessor.handle_cache_access_and_eviction_externally();
@@ -528,16 +507,10 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         let predecessor_leaf = predecessor.leaf_write.leaf.as_ref().unwrap();
         assert!(predecessor_leaf.hi.is_some());
 
-        #[cfg(feature = "for-internal-testing-only")]
-        let _b0 = track_blocks();
-
-        loop {
+                loop {
             let search_key = predecessor_leaf.hi.as_ref().unwrap();
 
-            #[cfg(feature = "for-internal-testing-only")]
-            let _b1 = track_blocks();
-
-            let successor_node = self.leaf_for_key_mut(search_key)?;
+                        let successor_node = self.leaf_for_key_mut(search_key)?;
 
             let successor_leaf =
                 successor_node.leaf_write.leaf.as_ref().unwrap();
@@ -581,15 +554,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
             leaf.lo
         );
 
-        #[cfg(feature = "for-internal-testing-only")]
-        {
-            self.cache.event_verifier.mark(
-                object_id,
-                old_dirty_epoch,
-                event_verifier::State::CooperativelySerialized,
-                concat!(file!(), ':', line!(), ":cooperative-serialize"),
-            );
-        }
+        
 
         // be extra-explicit about serialized bytes
         let leaf_ref: &Leaf<LEAF_FANOUT> = &*leaf;
@@ -620,16 +585,10 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
         &'a self,
         key: &[u8],
     ) -> io::Result<LeafReadGuard<'a, LEAF_FANOUT>> {
-        #[cfg(feature = "for-internal-testing-only")]
-        let _b0 = track_blocks();
-
-        loop {
+                      loop {
             let (low_key, node) = self.index.get_lte(key).unwrap();
 
-            #[cfg(feature = "for-internal-testing-only")]
-            let _b1 = track_blocks();
-
-            let mut read = node.inner.read_arc();
+                        let mut read = node.inner.read_arc();
 
             if read.leaf.is_none() {
                 drop(read);
@@ -866,15 +825,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 },
             );
 
-            #[cfg(feature = "for-internal-testing-only")]
-            {
-                self.cache.event_verifier.mark(
-                    leaf_guard.node.object_id,
-                    new_epoch,
-                    event_verifier::State::Dirty,
-                    concat!(file!(), ':', line!(), ":insert"),
-                );
-            }
+            
         }
         if let Some((split_key, rhs_node)) = split {
             assert_eq!(leaf.hi.as_ref().unwrap(), &split_key);
@@ -899,15 +850,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 },
             );
 
-            #[cfg(feature = "for-internal-testing-only")]
-            {
-                self.cache.event_verifier.mark(
-                    rhs_object_id,
-                    new_epoch,
-                    event_verifier::State::Dirty,
-                    concat!(file!(), ':', line!(), ":insert-split"),
-                );
-            }
+            
 
             // NB only make the new node reachable via the index after
             // we marked it as dirty, as from this point on, any other
@@ -981,15 +924,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 },
             );
 
-            #[cfg(feature = "for-internal-testing-only")]
-            {
-                self.cache.event_verifier.mark(
-                    leaf_guard.node.object_id,
-                    new_epoch,
-                    event_verifier::State::Dirty,
-                    concat!(file!(), ':', line!(), ":remove"),
-                );
-            }
+            
 
             if cfg!(not(feature = "monotonic-behavior"))
                 && leaf.is_empty()
@@ -1127,15 +1062,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 },
             );
 
-            #[cfg(feature = "for-internal-testing-only")]
-            {
-                self.cache.event_verifier.mark(
-                    leaf_guard.node.object_id,
-                    new_epoch,
-                    event_verifier::State::Dirty,
-                    concat!(file!(), ':', line!(), ":cas"),
-                );
-            }
+            
         }
         if let Some((split_key, rhs_node)) = split {
             trace_log!(
@@ -1153,15 +1080,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 },
             );
 
-            #[cfg(feature = "for-internal-testing-only")]
-            {
-                self.cache.event_verifier.mark(
-                    rhs_node.object_id,
-                    new_epoch,
-                    event_verifier::State::Dirty,
-                    concat!(file!(), ':', line!(), "cas-split"),
-                );
-            }
+            
 
             // NB only make the new node reachable via the index after
             // we marked it as dirty, as from this point on, any other
@@ -1498,10 +1417,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                     &self.cache,
                     self.collection_id,
                 ) {
-                    #[cfg(feature = "for-internal-testing-only")]
-                    let _b1 = track_blocks();
-
-                    let write = rhs_node.inner.write_arc();
+                                        let write = rhs_node.inner.write_arc();
                     assert!(write.leaf.is_some());
 
                     splits.push((split_key.clone(), rhs_node.clone()));
@@ -1542,15 +1458,7 @@ impl<const LEAF_FANOUT: usize> Tree<LEAF_FANOUT> {
                 },
             );
 
-            #[cfg(feature = "for-internal-testing-only")]
-            {
-                self.cache.event_verifier.mark(
-                    node.object_id,
-                    new_epoch,
-                    event_verifier::State::Dirty,
-                    concat!(file!(), ':', line!(), ":apply-batch"),
-                );
-            }
+            
         }
 
         // Drop locks

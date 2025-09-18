@@ -169,9 +169,7 @@ impl<const LEAF_FANOUT: usize> Db<LEAF_FANOUT> {
         let mut ever_seen = std::collections::HashSet::new();
         let before = std::time::Instant::now();
 
-        #[cfg(feature = "for-internal-testing-only")]
-        let _b0 = crate::block_checker::track_blocks();
-
+        
         for (_cid, tree) in self.trees.lock().iter() {
             let mut hi_none_count = 0;
             let mut last_hi = None;

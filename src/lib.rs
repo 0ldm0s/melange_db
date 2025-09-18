@@ -10,8 +10,6 @@
 //! - 优化的flush机制
 //! - 更高效的内存管理
 
-#[cfg(feature = "for-internal-testing-only")]
-mod block_checker;
 pub mod block_cache;
 pub mod bloom_filter;
 pub mod smart_flush;
@@ -31,12 +29,11 @@ mod tree;
 
 #[cfg(any(
     feature = "testing-shred-allocator",
-    feature = "testing-count-allocator"
+    feature = "testing-count-allocator",
+    feature = "mimalloc"
 ))]
 pub mod alloc;
 
-#[cfg(feature = "for-internal-testing-only")]
-mod event_verifier;
 
 #[inline]
 fn debug_delay() {

@@ -153,9 +153,7 @@ pub struct ObjectCache<const LEAF_FANOUT: usize> {
     dirty: ConcurrentMap<(FlushEpoch, ObjectId), Dirty<LEAF_FANOUT>, 4>,
     compacted_heap_slots: Arc<AtomicU64>,
     pub(super) tree_leaves_merged: Arc<AtomicU64>,
-    #[cfg(feature = "for-internal-testing-only")]
-    pub(super) event_verifier: Arc<crate::event_verifier::EventVerifier>,
-    invariants: Arc<FlushInvariants>,
+        invariants: Arc<FlushInvariants>,
     flush_stats: Arc<RwLock<FlushStatTracker>>,
     pub(super) read_stats: Arc<ReadStatTracker>,
     // 优化组件
@@ -182,9 +180,7 @@ impl<const LEAF_FANOUT: usize> Clone for ObjectCache<LEAF_FANOUT> {
             dirty: self.dirty.clone(),
             compacted_heap_slots: self.compacted_heap_slots.clone(),
             tree_leaves_merged: self.tree_leaves_merged.clone(),
-            #[cfg(feature = "for-internal-testing-only")]
-            event_verifier: self.event_verifier.clone(),
-            invariants: self.invariants.clone(),
+                        invariants: self.invariants.clone(),
             flush_stats: self.flush_stats.clone(),
             read_stats: self.read_stats.clone(),
             bloom_filter: self.bloom_filter.clone(),
@@ -258,9 +254,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
             heap,
             dirty: Default::default(),
             flush_epoch: Default::default(),
-            #[cfg(feature = "for-internal-testing-only")]
-            event_verifier: Arc::default(),
-            compacted_heap_slots: Arc::default(),
+                        compacted_heap_slots: Arc::default(),
             tree_leaves_merged: Arc::default(),
             invariants: Arc::default(),
             flush_stats: Arc::default(),
@@ -406,16 +400,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
     ) -> ObjectId {
         let object_id = self.heap.allocate_object_id();
 
-        #[cfg(feature = "for-internal-testing-only")]
-        {
-            self.event_verifier.mark(
-                object_id,
-                flush_epoch,
-                event_verifier::State::CleanPagedIn,
-                concat!(file!(), ':', line!(), ":allocated"),
-            );
-        }
-
+        
         object_id
     }
 
@@ -511,15 +496,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                 leaf.page_out_on_flush =
                     leaf.page_out_on_flush.max(Some(max_unflushed_epoch));
             } else {
-                #[cfg(feature = "for-internal-testing-only")]
-                {
-                    self.event_verifier.mark(
-                        node.object_id,
-                        flush_epoch,
-                        event_verifier::State::PagedOut,
-                        concat!(file!(), ':', line!(), ":page-out"),
-                    );
-                }
+                
                 write.leaf = None;
             }
         }
@@ -614,20 +591,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                     );
                     write_batch.push(Update::Free { object_id, collection_id });
 
-                    #[cfg(feature = "for-internal-testing-only")]
-                    {
-                        self.event_verifier.mark(
-                            object_id,
-                            dirty_epoch,
-                            event_verifier::State::AddedToWriteBatch,
-                            concat!(
-                                file!(),
-                                ':',
-                                line!(),
-                                ":flush-merged-and-deleted"
-                            ),
-                        );
-                    }
+                    
                 }
                 Dirty::CooperativelySerialized {
                     object_id: _,
@@ -645,20 +609,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                         data,
                     });
 
-                    #[cfg(feature = "for-internal-testing-only")]
-                    {
-                        self.event_verifier.mark(
-                            dirty_object_id,
-                            dirty_epoch,
-                            event_verifier::State::AddedToWriteBatch,
-                            concat!(
-                                file!(),
-                                ':',
-                                line!(),
-                                ":flush-cooperative"
-                            ),
-                        );
-                    }
+                    
                 }
                 Dirty::NotYetSerialized { low_key, collection_id, node } => {
                     assert_eq!(low_key, node.low_key);
@@ -676,10 +627,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                     {
                         lock_ref
                     } else {
-                        #[cfg(feature = "for-internal-testing-only")]
-                        self.event_verifier
-                            .print_debug_history_for_object(dirty_object_id);
-
+                        
                         panic!(
                             "failed to get lock for node that was NotYetSerialized, low key {:?} id {:?}",
                             low_key, node.object_id
@@ -692,37 +640,13 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                         == Some(flush_through_epoch)
                     {
                         if let Some(deleted_at) = leaf_ref.deleted {
-                            #[cfg(feature = "for-internal-testing-only")]
-                            if deleted_at <= flush_through_epoch {
-                                println!(
-                                    "{dirty_object_id:?} deleted at {deleted_at:?} \
-                                    but we are flushing at {flush_through_epoch:?}"
-                                );
-                                self.event_verifier
-                                    .print_debug_history_for_object(
-                                        dirty_object_id,
-                                    );
-                            }
-                            assert!(deleted_at > flush_through_epoch);
+                                                        assert!(deleted_at > flush_through_epoch);
                         }
 
                         leaf_ref.max_unflushed_epoch =
                             leaf_ref.dirty_flush_epoch.take();
 
-                        #[cfg(feature = "for-internal-testing-only")]
-                        {
-                            self.event_verifier.mark(
-                                dirty_object_id,
-                                dirty_epoch,
-                                event_verifier::State::AddedToWriteBatch,
-                                concat!(
-                                    file!(),
-                                    ':',
-                                    line!(),
-                                    ":flush-serialize"
-                                ),
-                            );
-                        }
+                        
 
                         leaf_ref.serialize(self.config.zstd_compression_level)
                     } else {
@@ -747,20 +671,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                             assert_eq!(collection_id, ci2);
                             Arc::make_mut(&mut data);
 
-                            #[cfg(feature = "for-internal-testing-only")]
-                            {
-                                self.event_verifier.mark(
-                                    dirty_object_id,
-                                    dirty_epoch,
-                                    event_verifier::State::AddedToWriteBatch,
-                                    concat!(
-                                        file!(),
-                                        ':',
-                                        line!(),
-                                        ":flush-laggy-cooperative"
-                                    ),
-                                );
-                            }
+                            
 
                             Arc::into_inner(data).unwrap()
                         } else {
@@ -772,11 +683,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                                 (dirty_epoch, dirty_object_id),
                                 leaf_ref.deleted,
                             );
-                            #[cfg(feature = "for-internal-testing-only")]
-                            self.event_verifier.print_debug_history_for_object(
-                                dirty_object_id,
-                            );
-                            unreachable!(
+                                                        unreachable!(
                                 "a leaf was expected to be cooperatively serialized but it was not available. \
                                 violation of flush responsibility for second read \
                                 of expected cooperative serialization. leaf in question's \
@@ -895,18 +802,6 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
 
         let storage_latency = before_storage.elapsed();
 
-        #[cfg(feature = "for-internal-testing-only")]
-        {
-            for update_object_id in write_batch_object_ids {
-                self.event_verifier.mark(
-                    update_object_id,
-                    flush_through_epoch,
-                    event_verifier::State::Flushed,
-                    concat!(file!(), ':', line!(), ":flush-finished"),
-                );
-            }
-        }
-
         trace_log!(
             "marking the forward flush notifier that {:?} is flushed",
             flush_through_epoch
@@ -933,15 +828,7 @@ impl<const LEAF_FANOUT: usize> ObjectCache<LEAF_FANOUT> {
                 continue;
             }
 
-            #[cfg(feature = "for-internal-testing-only")]
-            {
-                self.event_verifier.mark(
-                    node_to_evict.object_id,
-                    flush_through_epoch,
-                    event_verifier::State::PagedOut,
-                    concat!(file!(), ':', line!(), ":page-out-after-flush"),
-                );
-            }
+            
 
             lock.leaf = None;
         }
