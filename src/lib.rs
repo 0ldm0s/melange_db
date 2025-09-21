@@ -100,6 +100,58 @@ pub fn open<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<Db> {
     Config::new().path(path).open()
 }
 
+/// 清理指定路径的数据库锁文件
+///
+/// 这个函数会清理指定路径下的所有锁文件，包括：
+/// - `.lock` - 主要的数据库锁文件
+/// - `.meta_lock` - 元数据存储锁文件
+///
+/// # 参数
+/// * `path` - 数据库路径
+///
+/// # 返回值
+/// 返回 `Ok(usize)` 表示成功清理的锁文件数量，
+/// 或返回 `std::io::Error` 表示清理过程中遇到的错误。
+///
+/// # 示例
+/// ```no_run
+/// use melange_db;
+///
+/// match melange_db::cleanup_lock_files("./my_database") {
+///     Ok(count) => println!("成功清理了 {} 个锁文件", count),
+///     Err(e) => eprintln!("清理锁文件失败: {}", e),
+/// }
+/// ```
+pub fn cleanup_lock_files<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<usize> {
+    use std::fs;
+    use std::path::Path;
+
+    let path = path.as_ref();
+    let mut cleaned_count = 0;
+
+    // 锁文件列表
+    let lock_files = [".lock", ".meta_lock"];
+
+    for lock_file in &lock_files {
+        let lock_path = path.join(lock_file);
+
+        if lock_path.exists() {
+            match fs::remove_file(&lock_path) {
+                Ok(_) => {
+                    cleaned_count += 1;
+                    eprintln!("已清理锁文件: {:?}", lock_path);
+                }
+                Err(e) => {
+                    eprintln!("清理锁文件失败 {:?}: {}", lock_path, e);
+                    // 继续尝试清理其他锁文件
+                }
+            }
+        }
+    }
+
+    Ok(cleaned_count)
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct Stats {
     pub cache: CacheStats,
