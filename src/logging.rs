@@ -1,13 +1,14 @@
 //! 高性能日志模块
 //!
-//! 使用tracing替代标准log库，提供零成本抽象和更好的性能
+//! 使用rat_logger日志库，由调用者负责初始化
+//! 库本身不进行日志初始化，保持配置灵活性
 
 /// 调试级别日志 - 仅在debug模式下编译
 #[macro_export]
 macro_rules! debug_log {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
-        tracing::debug!($($arg)*);
+        rat_logger::debug!($($arg)*);
 
         #[cfg(not(debug_assertions))]
         {
@@ -21,7 +22,7 @@ macro_rules! debug_log {
 macro_rules! trace_log {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
-        tracing::trace!($($arg)*);
+        rat_logger::trace!($($arg)*);
     };
 }
 
@@ -30,7 +31,7 @@ macro_rules! trace_log {
 macro_rules! info_log {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
-        tracing::info!($($arg)*);
+        rat_logger::info!($($arg)*);
     };
 }
 
@@ -38,7 +39,7 @@ macro_rules! info_log {
 #[macro_export]
 macro_rules! warn_log {
     ($($arg:tt)*) => {
-        tracing::warn!($($arg)*);
+        rat_logger::warn!($($arg)*);
     };
 }
 
@@ -46,23 +47,8 @@ macro_rules! warn_log {
 #[macro_export]
 macro_rules! error_log {
     ($($arg:tt)*) => {
-        tracing::error!($($arg)*);
+        rat_logger::error!($($arg)*);
     };
-}
-
-/// 初始化日志系统
-pub fn init_logging() {
-    use tracing_subscriber::{fmt, EnvFilter};
-
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
-
-    fmt()
-        .with_env_filter(filter)
-        .with_target(false)
-        .with_thread_ids(false)
-        .with_thread_names(false)
-        .init();
 }
 
 /// 性能关键路径的零成本日志
@@ -87,3 +73,4 @@ macro_rules! perf_trace {
         { $($arg)* }
     };
 }
+

@@ -139,7 +139,7 @@ cargo build --release --features compression-zstd
 
 ```toml
 [dependencies]
-melange_db = "0.1.3"
+melange_db = "0.1.5"
 ```
 
 ## サンプル

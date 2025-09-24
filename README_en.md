@@ -139,7 +139,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-melange_db = "0.1.3"
+melange_db = "0.1.5"
 ```
 
 ## Examples
@@ -158,6 +158,41 @@ We provide several examples to help you better use Melange DB:
 ### 🎯 Best Practice Examples
 - **`best_practices.rs`** - Complete production environment usage example
 
+### 📝 Logging System Integration Example
+- **`rat_logger_demo.rs`** - Shows how to integrate rat_logger logging system
+
+### ⚠️ Safety Guarantee
+
+**Behavior when logging is not initialized**:
+- ✅ **Completely Safe**: All logging calls are silently ignored if rat_logger is not initialized
+- ✅ **Zero Exceptions**: No panics, errors, or runtime exceptions will occur
+- ✅ **Normal Execution**: Programs run completely normally, just without log output
+- ✅ **Zero Overhead**: Debug level logs are zero-cost in release mode anyway
+- ✅ **Backward Compatible**: Old code works fine without logger initialization
+
+This design ensures:
+- **Gradual Adoption**: Selectively enable logging for specific modules
+- **Production Friendly**: Completely zero overhead when logging is not needed
+- **Caller Full Control**: Callers decide whether logging functionality is needed
+
+```rust
+// Code works fine even without initializing logging
+use melange_db::{Db, Config};
+
+fn main() -> anyhow::Result<()> {
+    // Note: rat_logger is not initialized here!
+
+    let config = Config::new()
+        .path("example_db")
+        .cache_capacity_bytes(1024 * 1024);
+
+    let db: Db<1024> = config.open()?;
+    let tree = db.open_tree("my_tree")?;
+    tree.insert(b"key", b"value")?;  // Log calls are silently ignored
+    Ok(())
+}
+```
+
 ### Running Examples
 
 ```bash
@@ -166,6 +201,9 @@ cargo run --example performance_demo
 
 # Run precise timing analysis
 cargo run --example accurate_timing_demo
+
+# Run logging system integration example
+cargo run --example rat_logger_demo
 
 # Run compression algorithm performance comparison
 cargo run --example macbook_air_m1_compression_none --features compression-none --release

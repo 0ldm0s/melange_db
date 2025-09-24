@@ -213,6 +213,12 @@ fn main() -> anyhow::Result<()> {
   - 范围查询
   - 数据清理
 
+### 📝 日志系统集成示例
+- **`rat_logger_demo.rs`** - 展示如何集成 rat_logger 日志系统：
+  - 日志初始化配置
+  - 性能调试输出
+  - 由调用者控制日志行为
+
 ### ⚠️ 重要说明
 
 **示例代码优化目标**: 当前示例主要针对 Apple M1 等高端 ARM64 设备优化，配置了较大的缓存（1GB）和适用于高性能场景的参数。
@@ -233,6 +239,9 @@ cargo run --example accurate_timing_demo
 
 # 运行最佳实践示例
 cargo run --example best_practices
+
+# 运行日志系统集成示例
+cargo run --example rat_logger_demo
 
 # 运行压缩算法性能对比（需要指定压缩特性）
 cargo run --example macbook_air_m1_compression_none --features compression-none --release
@@ -413,6 +422,7 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
 - [x] 多压缩算法特性选择（无压缩/LZ4/Zstd，编译时特性控制）
 - [x] 压缩算法性能优化和测试数据收集
 - [x] Apple Silicon M1专项优化和性能验证
+- [x] 集成 rat_logger 高性能日志系统，支持调用者配置
 
 ### 🔄 进行中
 - [ ] 自适应压缩策略（运行时根据数据特征选择压缩算法）
@@ -481,7 +491,108 @@ config.smart_flush_config = crate::smart_flush::SmartFlushConfig {
   - std::arch::aarch64 (ARM64 NEON指令集)
   - std::arch::x86_64 (x86_64 SSE2/AVX2指令集)
 - **压缩**: zstd, lz4_flex（特性可选）
+- **日志**: rat_logger（高性能异步日志系统）
 - **测试**: criterion, tokio-test
+
+### 日志系统集成
+
+Melange DB 现已集成 rat_logger 高性能日志系统，提供灵活的日志配置选项：
+
+#### 主要特性
+- **高性能异步日志**: 基于 rat_logger 的高性能异步日志架构
+- **调用者配置**: 库本身不初始化日志，由调用者控制日志行为
+- **多种输出方式**: 支持终端输出、文件记录、网络传输等多种日志方式
+- **性能优化**: 在 release 模式下，调试级别日志完全零成本
+- **安全设计**: 未初始化日志时静默忽略，不会影响程序正常运行
+
+#### 基本使用示例
+```rust
+use melange_db::{Db, Config};
+use rat_logger::{LoggerBuilder, LevelFilter, handler::term::TermConfig};
+
+fn main() -> anyhow::Result<()> {
+    // 初始化日志系统 - 由调用者配置
+    LoggerBuilder::new()
+        .add_terminal_with_config(TermConfig::default())
+        .with_level(LevelFilter::Debug)
+        .init()?;
+
+    // 配置并打开数据库
+    let config = Config::new()
+        .path("example_db")
+        .cache_capacity_bytes(1024 * 1024); // 1MB 缓存
+
+    let db: Db<1024> = config.open()?;
+
+    // 数据库操作将自动输出日志
+    let tree = db.open_tree("my_tree")?;
+    tree.insert(b"key", b"value")?;
+
+    Ok(())
+}
+```
+
+#### 日志级别说明
+- **ERROR**: 严重错误，总是记录
+- **WARN**: 警告信息，总是记录
+- **INFO**: 重要信息，在 debug 模式下记录
+- **DEBUG**: 调试信息，在 debug 模式下记录
+- **TRACE**: 追踪信息，在 debug 模式下记录
+
+#### 高级配置示例
+```rust
+use rat_logger::{LoggerBuilder, LevelFilter, handler::{
+    term::TermConfig,
+    file::FileConfig,
+    composite::CompositeHandler
+}};
+
+// 同时输出到终端和文件
+let mut handler = CompositeHandler::new();
+handler.add_handler(Box::new(TermProcessor::new(TermConfig::default())?));
+handler.add_handler(Box::new(FileProcessor::new(FileConfig {
+    file_path: "melange_db.log".to_string(),
+    rotation_size_mb: 100,
+    max_files: 5,
+})?));
+
+LoggerBuilder::new()
+    .add_custom_handler(handler)
+    .with_level(LevelFilter::Info)
+    .init()?;
+```
+
+#### ⚠️ 安全保证
+
+**未初始化日志时的行为**:
+- ✅ **完全安全**: 如果调用者没有初始化日志系统，所有日志调用会被静默忽略
+- ✅ **零异常**: 不会产生panic、错误或任何运行时异常
+- ✅ **正常执行**: 程序会完全正常运行，只是没有日志输出
+- ✅ **零开销**: 在release模式下，调试级别日志本来就是零成本的
+- ✅ **向后兼容**: 旧代码不初始化日志也能正常运行
+
+这种设计确保了:
+- **渐进式采用**: 可以选择性为特定模块启用日志
+- **生产环境友好**: 在不需要日志时完全零开销
+- **调用者完全控制**: 完全由调用者决定是否需要日志功能
+
+```rust
+// 即使不初始化日志，以下代码也能正常运行
+use melange_db::{Db, Config};
+
+fn main() -> anyhow::Result<()> {
+    // 注意：这里没有初始化rat_logger！
+
+    let config = Config::new()
+        .path("example_db")
+        .cache_capacity_bytes(1024 * 1024);
+
+    let db: Db<1024> = config.open()?;
+    let tree = db.open_tree("my_tree")?;
+    tree.insert(b"key", b"value")?;  // 日志调用被静默忽略
+    Ok(())
+}
+```
 
 ### 压缩算法选择（编译时特性）
 

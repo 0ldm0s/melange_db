@@ -1,6 +1,6 @@
 [package]
 name = "melange_db"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 authors = ["0ldm0s <oldmos@gmail.com>"]
 description = "基于 sled 架构深度优化的下一代高性能嵌入式数据库，支持 ARM64 NEON SIMD 优化、多级缓存和布隆过滤器"
@@ -58,8 +58,7 @@ crc32fast = "1.3.2"
 ebr = "0.2.13"
 inline-array = { version = "0.1.13", features = ["serde", "concurrent_map_minimum"] }
 fs2 = "0.4.3"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+rat_logger = "0.2.8"
 pagetable = "0.4.5"
 parking_lot = { version = "0.12.1", features = ["arc_lock"] }
 rayon = "1.7.0"
