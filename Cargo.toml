@@ -73,6 +73,7 @@ crossbeam-queue = "0.3.8"
 crossbeam-channel = "0.5.8"
 tempdir = "0.3.7"
 tempfile = "3.0"
+chrono = { version = "0.4", features = ["serde"] }
 
 [dev-dependencies]
 env_logger = "0.10.0"
