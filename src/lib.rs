@@ -25,6 +25,8 @@ mod object_cache;
 mod object_location_mapper;
 pub mod platform_utils;
 pub mod simd_optimized;
+pub mod atomic_worker;
+pub mod atomic_operations_manager;
 mod tree;
 
 #[cfg(any(
