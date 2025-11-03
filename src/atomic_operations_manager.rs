@@ -54,6 +54,57 @@ impl AtomicOperationsManager {
         self.atomic_worker.increment(counter_name, delta)
     }
 
+    /// 原子递减操作
+    ///
+    /// # Arguments
+    /// * `counter_name` - 计数器名称
+    /// * `delta` - 递减量
+    pub fn decrement(&self, counter_name: String, delta: u64) -> io::Result<u64> {
+        trace_log!("路由原子递减操作: {} - {}", counter_name, delta);
+        self.atomic_worker.decrement(counter_name, delta)
+    }
+
+    /// 原子乘法操作
+    ///
+    /// # Arguments
+    /// * `counter_name` - 计数器名称
+    /// * `factor` - 乘法因子
+    pub fn multiply(&self, counter_name: String, factor: u64) -> io::Result<u64> {
+        trace_log!("路由原子乘法操作: {} * {}", counter_name, factor);
+        self.atomic_worker.multiply(counter_name, factor)
+    }
+
+    /// 原子除法操作
+    ///
+    /// # Arguments
+    /// * `counter_name` - 计数器名称
+    /// * `divisor` - 除数
+    pub fn divide(&self, counter_name: String, divisor: u64) -> io::Result<u64> {
+        trace_log!("路由原子除法操作: {} / {}", counter_name, divisor);
+        self.atomic_worker.divide(counter_name, divisor)
+    }
+
+    /// 原子百分比操作
+    ///
+    /// # Arguments
+    /// * `counter_name` - 计数器名称
+    /// * `percentage` - 百分比值 (0-100)
+    pub fn percentage(&self, counter_name: String, percentage: u64) -> io::Result<u64> {
+        trace_log!("路由原子百分比操作: {} * {}%", counter_name, percentage);
+        self.atomic_worker.percentage(counter_name, percentage)
+    }
+
+    /// 原子比较和交换操作
+    ///
+    /// # Arguments
+    /// * `counter_name` - 计数器名称
+    /// * `expected` - 期望的当前值
+    /// * `new_value` - 要设置的新值
+    pub fn compare_and_swap(&self, counter_name: String, expected: u64, new_value: u64) -> io::Result<bool> {
+        trace_log!("路由原子比较和交换操作: {} (expected: {}, new: {})", counter_name, expected, new_value);
+        self.atomic_worker.compare_and_swap(counter_name, expected, new_value)
+    }
+
     /// 获取计数器值
     pub fn get(&self, counter_name: String) -> io::Result<Option<u64>> {
         trace_log!("路由获取计数器操作: {}", counter_name);

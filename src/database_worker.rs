@@ -14,7 +14,7 @@ use crate::db::Db;
 
 /// 数据库操作类型
 #[derive(Debug, Clone)]
-pub enum DatabaseOperation {
+pub(crate) enum DatabaseOperation {
     /// 插入数据
     Insert {
         key: Vec<u8>,
@@ -46,7 +46,7 @@ pub enum DatabaseOperation {
 /// 数据库操作Worker
 ///
 /// 专门处理所有数据库操作，与原子操作完全解耦
-pub struct DatabaseWorker {
+pub(crate) struct DatabaseWorker {
     /// 操作队列 (无锁并发队列)
     operation_queue: Arc<SegQueue<DatabaseOperation>>,
 
@@ -62,7 +62,7 @@ impl DatabaseWorker {
     ///
     /// # Arguments
     /// * `db` - 数据库实例引用
-    pub fn new(db: Arc<Db<1024>>) -> Self {
+    pub(crate) fn new(db: Arc<Db<1024>>) -> Self {
         let operation_queue = Arc::new(SegQueue::new());
         let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
@@ -166,7 +166,7 @@ impl DatabaseWorker {
     }
 
     /// 提交插入操作
-    pub fn insert(&self, key: Vec<u8>, value: Vec<u8>) -> io::Result<Option<InlineArray>> {
+    pub(crate) fn insert(&self, key: Vec<u8>, value: Vec<u8>) -> io::Result<Option<InlineArray>> {
         let (response_tx, response_rx) = std::sync::mpsc::channel();
 
         let operation = DatabaseOperation::Insert {
@@ -183,7 +183,7 @@ impl DatabaseWorker {
     }
 
     /// 提交获取操作
-    pub fn get(&self, key: Vec<u8>) -> io::Result<Option<InlineArray>> {
+    pub(crate) fn get(&self, key: Vec<u8>) -> io::Result<Option<InlineArray>> {
         let (response_tx, response_rx) = std::sync::mpsc::channel();
 
         let operation = DatabaseOperation::Get {
@@ -199,7 +199,7 @@ impl DatabaseWorker {
     }
 
     /// 提交原子计数器持久化操作
-    pub fn persist_counter(&self, counter_name: String, value: u64) -> io::Result<()> {
+    pub(crate) fn persist_counter(&self, counter_name: String, value: u64) -> io::Result<()> {
         let (response_tx, response_rx) = std::sync::mpsc::channel();
 
         let operation = DatabaseOperation::PersistCounter {
@@ -216,7 +216,7 @@ impl DatabaseWorker {
     }
 
     /// 提交预热计数器操作
-    pub fn preload_counters(&self) -> io::Result<Vec<(String, u64)>> {
+    pub(crate) fn preload_counters(&self) -> io::Result<Vec<(String, u64)>> {
         let (response_tx, response_rx) = std::sync::mpsc::channel();
 
         let operation = DatabaseOperation::PreloadCounters {
@@ -231,7 +231,7 @@ impl DatabaseWorker {
     }
 
     /// 提交扫描前缀操作
-    pub fn scan_prefix(&self, prefix: Vec<u8>) -> io::Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    pub(crate) fn scan_prefix(&self, prefix: Vec<u8>) -> io::Result<Vec<(Vec<u8>, Vec<u8>)>> {
         let (response_tx, response_rx) = std::sync::mpsc::channel();
 
         let operation = DatabaseOperation::ScanPrefix {
@@ -247,7 +247,7 @@ impl DatabaseWorker {
     }
 
     /// 获取操作队列引用（供其他Worker使用）
-    pub fn operation_queue(&self) -> &Arc<SegQueue<DatabaseOperation>> {
+    pub(crate) fn operation_queue(&self) -> &Arc<SegQueue<DatabaseOperation>> {
         &self.operation_queue
     }
 }
