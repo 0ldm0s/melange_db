@@ -14,7 +14,7 @@ use dashmap::DashMap;
 use parking_lot::Mutex;
 
 use crate::{debug_log, trace_log, warn_log, error_log, info_log};
-use crate::db::Db;
+use super::database_worker::DatabaseOperation;
 
 /// 原子操作类型
 #[derive(Debug, Clone)]
@@ -40,7 +40,7 @@ pub enum AtomicOperation {
 
 /// 原子操作Worker
 ///
-/// 完全独立的原子计数器管理组件，不持有任何数据库引用
+/// 专门处理原子操作，完成后自动向DatabaseWorker发送持久化指令
 pub struct AtomicWorker {
     /// 内存中的原子计数器 (使用DashMap提供高性能并发访问)
     counters: Arc<DashMap<String, Arc<AtomicU64>>>,
@@ -53,23 +53,28 @@ pub struct AtomicWorker {
 
     /// 关闭信号
     shutdown_tx: Option<std::sync::mpsc::Sender<()>>,
+
+    /// 数据库Worker操作队列引用 (用于发送持久化指令)
+    db_queue: Option<Arc<SegQueue<DatabaseOperation>>>,
 }
 
 impl AtomicWorker {
     /// 创建新的原子操作Worker
     ///
-    /// 完全独立，不持有任何数据库引用
-    pub fn new(_db: Option<Arc<Db<1024>>>) -> Self {
+    /// # Arguments
+    /// * `db_queue` - 数据库Worker操作队列引用，用于发送持久化指令
+    pub fn new(db_queue: Option<Arc<SegQueue<DatabaseOperation>>>) -> Self {
         let counters = Arc::new(DashMap::new());
         let operation_queue = Arc::new(SegQueue::new());
         let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel();
 
         let worker_counters = counters.clone();
         let worker_queue = operation_queue.clone();
+        let worker_db_queue = db_queue.clone();
 
         let worker_handle = thread::spawn(move || {
             debug_log!("原子操作Worker线程启动");
-            Self::worker_loop(worker_counters, worker_queue, shutdown_rx);
+            Self::worker_loop(worker_counters, worker_queue, worker_db_queue, shutdown_rx);
             debug_log!("原子操作Worker线程退出");
         });
 
@@ -78,6 +83,7 @@ impl AtomicWorker {
             operation_queue,
             worker_handle: Some(worker_handle),
             shutdown_tx: Some(shutdown_tx),
+            db_queue,
         }
     }
 
@@ -85,6 +91,7 @@ impl AtomicWorker {
     fn worker_loop(
         counters: Arc<DashMap<String, Arc<AtomicU64>>>,
         operation_queue: Arc<SegQueue<AtomicOperation>>,
+        db_queue: Option<Arc<SegQueue<DatabaseOperation>>>,
         shutdown_rx: std::sync::mpsc::Receiver<()>,
     ) {
         loop {
@@ -101,7 +108,7 @@ impl AtomicWorker {
 
             // 处理操作队列
             if let Some(operation) = operation_queue.pop() {
-                Self::handle_operation(&counters, operation);
+                Self::handle_operation(&counters, operation, &db_queue);
             } else {
                 // 队列为空，短暂休眠避免CPU占用过高
                 thread::yield_now();
@@ -113,10 +120,11 @@ impl AtomicWorker {
     fn handle_operation(
         counters: &DashMap<String, Arc<AtomicU64>>,
         operation: AtomicOperation,
+        db_queue: &Option<Arc<SegQueue<DatabaseOperation>>>,
     ) {
         match operation {
             AtomicOperation::Increment { counter_name, delta, response_tx } => {
-                let result = Self::handle_increment(counters, &counter_name, delta);
+                let result = Self::handle_increment(counters, &counter_name, delta, db_queue);
                 let _ = response_tx.send(result);
             }
             AtomicOperation::Get { counter_name, response_tx } => {
@@ -124,7 +132,7 @@ impl AtomicWorker {
                 let _ = response_tx.send(result);
             }
             AtomicOperation::Reset { counter_name, new_value, response_tx } => {
-                let result = Self::handle_reset(counters, &counter_name, new_value);
+                let result = Self::handle_reset(counters, &counter_name, new_value, db_queue);
                 let _ = response_tx.send(result);
             }
         }
@@ -135,6 +143,7 @@ impl AtomicWorker {
         counters: &DashMap<String, Arc<AtomicU64>>,
         counter_name: &str,
         delta: u64,
+        db_queue: &Option<Arc<SegQueue<DatabaseOperation>>>,
     ) -> io::Result<u64> {
         trace_log!("处理原子递增: {} + {}", counter_name, delta);
 
@@ -146,6 +155,17 @@ impl AtomicWorker {
 
         // 执行原子递增（纯内存操作）
         let new_value = counter.fetch_add(delta, Ordering::SeqCst) + delta;
+
+        // 立即向DatabaseWorker发送持久化指令
+        if let Some(db_queue) = db_queue {
+            let persist_op = DatabaseOperation::PersistCounter {
+                counter_name: counter_name.to_string(),
+                value: new_value,
+                response_tx: std::sync::mpsc::channel().0, // 不需要响应，直接丢弃
+            };
+            db_queue.push(persist_op);
+            trace_log!("已发送持久化指令: {} = {}", counter_name, new_value);
+        }
 
         trace_log!("原子递增完成: {} = {}", counter_name, new_value);
         Ok(new_value)
@@ -173,6 +193,7 @@ impl AtomicWorker {
         counters: &DashMap<String, Arc<AtomicU64>>,
         counter_name: &str,
         new_value: u64,
+        db_queue: &Option<Arc<SegQueue<DatabaseOperation>>>,
     ) -> io::Result<()> {
         trace_log!("处理重置计数器: {} = {}", counter_name, new_value);
 
@@ -183,6 +204,17 @@ impl AtomicWorker {
             .clone();
 
         counter.store(new_value, Ordering::SeqCst);
+
+        // 立即向DatabaseWorker发送持久化指令
+        if let Some(db_queue) = db_queue {
+            let persist_op = DatabaseOperation::PersistCounter {
+                counter_name: counter_name.to_string(),
+                value: new_value,
+                response_tx: std::sync::mpsc::channel().0, // 不需要响应，直接丢弃
+            };
+            db_queue.push(persist_op);
+            trace_log!("已发送持久化指令: {} = {}", counter_name, new_value);
+        }
 
         trace_log!("重置计数器完成: {} = {}", counter_name, new_value);
         Ok(())

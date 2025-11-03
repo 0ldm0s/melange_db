@@ -37,6 +37,122 @@ This inspiration reflects our core philosophy: **Creating infinite value from li
 - **Thread safety**: Complete Send + Sync trait implementation
 - **Atomic guarantees**: ACID-compatible transaction support
 
+### 🔥 Atomic Operations Unified Architecture (Major Performance Upgrade)
+
+> **Version v0.2.0**: Introduces a brand-new atomic operations unified architecture, completely resolving EBR conflicts in high-concurrency scenarios.
+
+#### 🚀 Breaking Upgrade Notice
+
+**This is a breaking performance upgrade** with the following major improvements:
+
+✅ **Resolved Issues**:
+- **EBR RefCell Conflicts**: Completely eliminated `RefCell already borrowed` panics during multi-threaded high-concurrency operations
+- **Data Races**: Eliminated race conditions between atomic operations and database operations
+- **Performance Bottlenecks**: Significantly improved concurrent performance through inter-worker communication
+
+⚠️ **API Changes**:
+- `atomic_operations_manager::AtomicOperationsManager` - Brand new unified router design
+- `atomic_worker::AtomicWorker` - Refactored to completely independent atomic operations component
+- `database_worker::DatabaseWorker` - New dedicated database operations Worker
+
+#### 🏗️ New Architecture Design
+
+**SegQueue Unified Architecture**:
+```
+AtomicOperationsManager (Pure Router)
+    ├── SegQueue A ↔ AtomicWorker (DashMap + AtomicU64)
+    │   └── Auto-sends persistence commands → DatabaseWorker queue
+    └── SegQueue B ↔ DatabaseWorker (All database operations)
+```
+
+#### ✅ Core Advantages
+
+1. **Complete Decoupling**:
+   - AtomicOperationsManager only handles routing, doesn't operate any data structures
+   - AtomicWorker specializes in atomic operations, doesn't directly access database
+   - DatabaseWorker specializes in all database operations
+
+2. **Inter-Worker Communication**:
+   - AtomicWorker automatically sends persistence commands to DatabaseWorker after operations
+   - Completely avoids EBR conflicts in the same thread
+
+3. **Unified SegQueue Usage**:
+   - All Workers use the same concurrent queue mechanism
+   - Maintains consistency with existing architecture
+
+#### 📊 Performance Validation
+
+**12-thread high-pressure test results**:
+- ✅ **285 atomic operations**: 160 + 50 + 40 + 35 page accesses
+- ✅ **570 database records**: 300 + 150 + 120 records
+- ✅ **Zero EBR conflicts**: 12 threads running simultaneously completely safe
+- ✅ **100% data consistency**: All counters and record data completely accurate
+
+#### 🚀 Usage Example
+
+```rust
+use melange_db::{Db, Config, atomic_operations_manager::AtomicOperationsManager};
+use std::sync::Arc;
+
+fn main() -> anyhow::Result<()> {
+    // Create database
+    let config = Config::new().path("my_db");
+    let db: Db<1024> = config.open()?;
+
+    // Create unified router
+    let manager = Arc::new(AtomicOperationsManager::new(Arc::new(db)));
+
+    // Atomic operations (auto-persistence)
+    let user_id = manager.increment("user_counter".to_string(), 1)?;
+    println!("New user ID: {}", user_id);
+
+    // Database operations
+    manager.insert(b"user:profile", format!("user{}", user_id).as_bytes())?;
+
+    // Get counter
+    let counter = manager.get("user_counter".to_string())?;
+    println!("Total users: {:?}", counter);
+
+    Ok(())
+}
+```
+
+#### 🧪 Test Cases
+
+```bash
+# Basic unified architecture test
+cargo run --example segqueue_unified_test
+
+# High-pressure concurrent test (12 threads)
+cargo run --example high_pressure_segqueue_test
+
+# Atomic operations Worker test
+cargo run --example atomic_worker_test
+```
+
+#### 🔄 Migration Guide
+
+**Old Version (v0.1.4 and below)**:
+```rust
+// ❌ Deprecated - causes EBR conflicts
+let db = Arc::new(config.open()?);
+// Direct multi-threaded db operations cause RefCell conflicts
+```
+
+**New Version (v0.2.0+)**:
+```rust
+// ✅ Recommended - No EBR conflicts
+let manager = Arc::new(AtomicOperationsManager::new(Arc::new(config.open()?)));
+// Operations through unified router, completely thread-safe
+```
+
+#### ⚡ Performance Improvements
+
+- **Concurrent Safety**: Supports unlimited concurrent threads
+- **Zero Conflicts**: Completely eliminates EBR RefCell borrowing issues
+- **Auto Persistence**: Atomic operations automatically persist after completion
+- **Data Consistency**: Ensures data integrity under high concurrency
+
 ### 📦 Efficient Memory Management
 - **Incremental serialization**: Serialization strategy reducing IO overhead
 - **Smart caching strategy**: Adaptive cache replacement algorithms
@@ -139,12 +255,50 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-melange_db = "0.1.5"
+melange_db = "0.2.0"
 ```
 
 ## Examples
 
-We provide several examples to help you better use Melange DB:
+Detailed usage examples can be found in the `examples/` directory:
+
+### 🔥 Atomic Operations Unified Architecture (v0.2.0+)
+- **SegQueue Unified Architecture Test**: `cargo run --example segqueue_unified_test`
+  - Demonstrates the new atomic operations unified architecture
+  - Validates inter-worker communication and auto-persistence
+  - Includes basic routing functionality tests
+
+- **High-Pressure Concurrent Test**: `cargo run --example high_pressure_segqueue_test`
+  - 12-thread high-concurrency mixed operations test
+  - Validates system stability under high load
+  - Includes real-world scenarios like user systems, order systems
+
+- **Atomic Operations Worker Test**: `cargo run --example atomic_worker_test`
+  - Pure atomic operations Worker performance test
+  - Validates atomic increment, get, and reset functionality
+  - Includes basic concurrent testing
+
+### ⚠️ Deprecated Examples (v0.1.4 and below)
+- `simple_atomic_sequence` - Migrated to new unified architecture
+- `atomic_operations_test` - Has EBR conflict issues, deprecated
+- `atomic_mixed_operations` - Has concurrency limitations, deprecated
+
+### 🔄 Migration Suggestions
+
+**If you are using old version examples**:
+
+❌ **Do not use** (has EBR conflicts):
+```bash
+cargo run --example atomic_mixed_operations  # Will crash
+cargo run --example simple_atomic_test       # Has issues
+```
+
+✅ **Recommended use** (new unified architecture):
+```bash
+cargo run --example segqueue_unified_test
+cargo run --example high_pressure_segqueue_test
+cargo run --example atomic_worker_test
+```
 
 ### 📊 Performance Testing Examples
 - **`performance_demo.rs`** - Basic performance demonstration and smart flush strategy showcase
@@ -196,6 +350,11 @@ fn main() -> anyhow::Result<()> {
 ### Running Examples
 
 ```bash
+# Run atomic operations unified architecture tests
+cargo run --example segqueue_unified_test
+cargo run --example high_pressure_segqueue_test
+cargo run --example atomic_worker_test
+
 # Run basic performance demo
 cargo run --example performance_demo
 

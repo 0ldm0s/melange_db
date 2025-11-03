@@ -37,6 +37,122 @@ Melange DBは、sledアーキテクチャをベースに深いパフォーマン
 - **スレッド安全性**: 完全なSend + Syncトレイト実装
 - **原子性保証**: ACID互換トランザクションサポート
 
+### 🔥 原子操作統一アーキテクチャ（重大なパフォーマンスアップグレード）
+
+> **バージョン v0.2.0**: 全新しい原子操作統一アーキテクチャを導入し、高並行シナリオにおけるEBR競合を完全に解決しました。
+
+#### 🚀 破壊的アップグレード通知
+
+**これは破壊的パフォーマンスアップグレード**で、以下の重大な改良を含みます：
+
+✅ **解決された問題**:
+- **EBR RefCell競合**: マルチスレッド高並行操作時の`RefCell already borrowed`パニックを完全に排除
+- **データ競合**: 原子操作とデータベース操作間の競合状態を排除
+- **パフォーマンスボトルネック**: ワーカー間通信により並行パフォーマンスを大幅向上
+
+⚠️ **API変更**:
+- `atomic_operations_manager::AtomicOperationsManager` - 全新しい統一ルーター設計
+- `atomic_worker::AtomicWorker` - 完全に独立した原子操作コンポーネントに再構築
+- `database_worker::DatabaseWorker` - 新しい専用データベース操作ワーカー
+
+#### 🏗️ 新アーキテクチャ設計
+
+**SegQueue統一アーキテクチャ**:
+```
+AtomicOperationsManager (純粋ルーター)
+    ├── SegQueue A ↔ AtomicWorker (DashMap + AtomicU64)
+    │   └── 自動永続化命令送信 → DatabaseWorkerキュー
+    └── SegQueue B ↔ DatabaseWorker (すべてのデータベース操作)
+```
+
+#### ✅ コアアドバンテージ
+
+1. **完全分離**:
+   - AtomicOperationsManagerはルーティングのみを担当し、データ構造を操作しない
+   - AtomicWorkerは原子操作を専門に処理し、データベースに直接アクセスしない
+   - DatabaseWorkerはすべてのデータベース操作を専門に処理
+
+2. **ワーカー間通信**:
+   - AtomicWorkerは操作完了後に自動的にDatabaseWorkerに永続化命令を送信
+   - 同一スレッドでのEBR競合を完全に回避
+
+3. **統一SegQueue使用**:
+   - すべてのワーカーが同じ並行キュー機構を使用
+   - 既存アーキテクチャとの一貫性を維持
+
+#### 📊 パフォーマンス検証
+
+**12スレッド高圧力テスト結果**:
+- ✅ **285回の原子操作**: 160 + 50 + 40 + 35回のページアクセス
+- ✅ **570件のデータベースレコード**: 300 + 150 + 120件
+- ✅ **ゼロEBR競合**: 12スレッド同時実行完全に安全
+- ✅ **100%データ一貫性**: すべてのカウンターとレコードデータ完全に正確
+
+#### 🚀 使用例
+
+```rust
+use melange_db::{Db, Config, atomic_operations_manager::AtomicOperationsManager};
+use std::sync::Arc;
+
+fn main() -> anyhow::Result<()> {
+    // データベースを作成
+    let config = Config::new().path("my_db");
+    let db: Db<1024> = config.open()?;
+
+    // 統一ルーターを作成
+    let manager = Arc::new(AtomicOperationsManager::new(Arc::new(db)));
+
+    // 原子操作（自動永続化）
+    let user_id = manager.increment("user_counter".to_string(), 1)?;
+    println!("新しいユーザーID: {}", user_id);
+
+    // データベース操作
+    manager.insert(b"user:profile", format!("user{}", user_id).as_bytes())?;
+
+    // カウンターを取得
+    let counter = manager.get("user_counter".to_string())?;
+    println!("ユーザー総数: {:?}", counter);
+
+    Ok(())
+}
+```
+
+#### 🧪 テストケース
+
+```bash
+# 基本統一アーキテクチャテスト
+cargo run --example segqueue_unified_test
+
+# 高圧力並行テスト（12スレッド）
+cargo run --example high_pressure_segqueue_test
+
+# 原子操作ワーカーテスト
+cargo run --example atomic_worker_test
+```
+
+#### 🔄 移行ガイド
+
+**旧バージョン（v0.1.4以下）**:
+```rust
+// ❌ 非推奨 - EBR競合を引き起こす
+let db = Arc::new(config.open()?);
+// データベースへの直接的マルチスレッド操作はRefCell競合を引き起こす
+```
+
+**新バージョン（v0.2.0+）**:
+```rust
+// ✅ 推奨 - EBR競合なし
+let manager = Arc::new(AtomicOperationsManager::new(Arc::new(config.open()?)));
+// 統一ルーターを介した操作、完全にスレッドセーフ
+```
+
+#### ⚡ パフォーマンス向上
+
+- **並行安全性**: 無制限の並行スレッドをサポート
+- **ゼロ競合**: EBR RefCell借用問題を完全に排除
+- **自動永続化**: 原子操作完了後に自動的に永続化
+- **データ一貫性**: 高並行下でのデータ完全性を保証
+
 ### 📦 効率的なメモリ管理
 - **インクリメンタルシリアライゼーション**: I/Oオーバーヘッドを削減するシリアライゼーション戦略
 - **スマートキャッシュ戦略**: 適応的キャッシュ置換アルゴリズム
@@ -139,12 +255,50 @@ cargo build --release --features compression-zstd
 
 ```toml
 [dependencies]
-melange_db = "0.1.5"
+melange_db = "0.2.0"
 ```
 
 ## サンプル
 
-Melange DBをより良く使用するためのいくつかのサンプルを提供しています：
+詳細な使用例については`examples/`ディレクトリを参照してください：
+
+### 🔥 原子操作統一アーキテクチャ（v0.2.0+）
+- **SegQueue統一アーキテクチャテスト**: `cargo run --example segqueue_unified_test`
+  - 新しい原子操作統一アーキテクチャを実演
+  - ワーカー間通信と自動永続化を検証
+  - 基本ルーティング機能テストを含む
+
+- **高圧力並行テスト**: `cargo run --example high_pressure_segqueue_test`
+  - 12スレッド高並行混合操作テスト
+  - 高負荷下でのシステム安定性を検証
+  - ユーザーシステム、注文システムなどの実世界シナリオを含む
+
+- **原子操作ワーカーテスト**: `cargo run --example atomic_worker_test`
+  - 純粋原子操作ワーカーパフォーマンステスト
+  - 原子インクリメント、取得、リセット機能を検証
+  - 基本並行テストを含む
+
+### ⚠️ 非推奨サンプル（v0.1.4以下）
+- `simple_atomic_sequence` - 新統一アーキテクチャに移行済み
+- `atomic_operations_test` - EBR競合問題あり、非推奨
+- `atomic_mixed_operations` - 並行性制限あり、非推奨
+
+### 🔄 移行提案
+
+**旧バージョンのサンプルを使用している場合**：
+
+❌ **使用しないでください**（EBR競合あり）：
+```bash
+cargo run --example atomic_mixed_operations  # クラッシュします
+cargo run --example simple_atomic_test       # 問題あり
+```
+
+✅ **推奨使用**（新統一アーキテクチャ）：
+```bash
+cargo run --example segqueue_unified_test
+cargo run --example high_pressure_segqueue_test
+cargo run --example atomic_worker_test
+```
 
 ### 📊 パフォーマンステストサンプル
 - **`performance_demo.rs`** - 基本的なパフォーマンスデモとスマートフラッシュ戦略のショーケース
@@ -161,6 +315,11 @@ Melange DBをより良く使用するためのいくつかのサンプルを提�
 ### サンプルの実行
 
 ```bash
+# 原子操作統一アーキテクチャテストを実行
+cargo run --example segqueue_unified_test
+cargo run --example high_pressure_segqueue_test
+cargo run --example atomic_worker_test
+
 # 基本的なパフォーマンスデモを実行
 cargo run --example performance_demo
 

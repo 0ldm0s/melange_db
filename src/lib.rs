@@ -27,6 +27,7 @@ pub mod platform_utils;
 pub mod simd_optimized;
 pub mod atomic_worker;
 pub mod atomic_operations_manager;
+pub mod database_worker;
 mod tree;
 
 #[cfg(any(
