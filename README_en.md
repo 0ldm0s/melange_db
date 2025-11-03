@@ -146,6 +146,8 @@ let manager = Arc::new(AtomicOperationsManager::new(Arc::new(config.open()?)));
 // Operations through unified router, completely thread-safe
 ```
 
+📖 **Detailed Migration Guide**: See [docs/migration_guide_v0.2.0_en.md](docs/migration_guide_v0.2.0_en.md) for complete upgrade steps and troubleshooting guide.
+
 #### ⚡ Performance Improvements
 
 - **Concurrent Safety**: Supports unlimited concurrent threads

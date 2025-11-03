@@ -16,7 +16,8 @@ perf_test_db/
 # Claude Code相关文件
 .claude/
 
-# 忽略根目录下的所有txt和md文件，但保留README*.md
+# 忽略所有txt和md文件，但保留README*.md和docs目录下的md文件
 *.txt
 *.md
 !README*.md
+!docs/**/*.md

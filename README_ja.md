@@ -146,6 +146,8 @@ let manager = Arc::new(AtomicOperationsManager::new(Arc::new(config.open()?)));
 // 統一ルーターを介した操作、完全にスレッドセーフ
 ```
 
+📖 **詳細な移行ガイド**: 完全なアップグレード手順とトラブルシューティングガイドについては [docs/migration_guide_v0.2.0_ja.md](docs/migration_guide_v0.2.0_ja.md) を参照してください。
+
 #### ⚡ パフォーマンス向上
 
 - **並行安全性**: 無制限の並行スレッドをサポート
