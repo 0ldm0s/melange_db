@@ -41,6 +41,11 @@ pub(crate) enum DatabaseOperation {
         prefix: Vec<u8>,
         response_tx: std::sync::mpsc::Sender<io::Result<Vec<(Vec<u8>, Vec<u8>)>>>,
     },
+    /// 删除数据
+    Remove {
+        key: Vec<u8>,
+        response_tx: std::sync::mpsc::Sender<io::Result<Option<InlineArray>>>,
+    },
 }
 
 /// 数据库操作Worker
@@ -162,6 +167,10 @@ impl DatabaseWorker {
                     });
                 let _ = response_tx.send(result);
             }
+            DatabaseOperation::Remove { key, response_tx } => {
+                let result = db.remove(&key);
+                let _ = response_tx.send(result);
+            }
         }
     }
 
@@ -236,6 +245,22 @@ impl DatabaseWorker {
 
         let operation = DatabaseOperation::ScanPrefix {
             prefix,
+            response_tx,
+        };
+
+        self.operation_queue.push(operation);
+
+        response_rx.recv().unwrap_or_else(|_| {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "DatabaseWorker连接断开"))
+        })
+    }
+
+    /// 提交删除操作
+    pub(crate) fn remove(&self, key: Vec<u8>) -> io::Result<Option<InlineArray>> {
+        let (response_tx, response_rx) = std::sync::mpsc::channel();
+
+        let operation = DatabaseOperation::Remove {
+            key,
             response_tx,
         };
 

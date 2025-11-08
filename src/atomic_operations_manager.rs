@@ -152,6 +152,12 @@ impl AtomicOperationsManager {
         self.database_worker.scan_prefix(prefix.to_vec())
     }
 
+    /// 执行数据库删除操作
+    pub fn remove(&self, key: &[u8]) -> io::Result<Option<InlineArray>> {
+        trace_log!("路由数据库删除操作: {:?}", key);
+        self.database_worker.remove(key.to_vec())
+    }
+
     /// 获取原子操作Worker引用（用于高级操作）
     pub fn atomic_worker(&self) -> &AtomicWorker {
         &self.atomic_worker
