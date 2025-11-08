@@ -158,6 +158,42 @@ impl AtomicOperationsManager {
         self.database_worker.remove(key.to_vec())
     }
 
+    /// 检查键是否存在
+    pub fn contains_key(&self, key: &[u8]) -> io::Result<bool> {
+        trace_log!("路由检查键存在操作: {:?}", key);
+        self.database_worker.contains_key(key.to_vec())
+    }
+
+    /// 清空所有数据
+    pub fn clear(&self) -> io::Result<()> {
+        trace_log!("路由清空数据库操作");
+        self.database_worker.clear()
+    }
+
+    /// 获取键值对总数
+    pub fn len(&self) -> io::Result<usize> {
+        trace_log!("路由获取键值对总数操作");
+        self.database_worker.len()
+    }
+
+    /// 检查数据库是否为空
+    pub fn is_empty(&self) -> io::Result<bool> {
+        trace_log!("路由检查数据库是否为空操作");
+        self.database_worker.is_empty()
+    }
+
+    /// 获取第一个键值对
+    pub fn first(&self) -> io::Result<Option<(InlineArray, InlineArray)>> {
+        trace_log!("路由获取第一个键值对操作");
+        self.database_worker.first()
+    }
+
+    /// 获取最后一个键值对
+    pub fn last(&self) -> io::Result<Option<(InlineArray, InlineArray)>> {
+        trace_log!("路由获取最后一个键值对操作");
+        self.database_worker.last()
+    }
+
     /// 获取原子操作Worker引用（用于高级操作）
     pub fn atomic_worker(&self) -> &AtomicWorker {
         &self.atomic_worker

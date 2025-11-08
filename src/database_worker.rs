@@ -46,6 +46,31 @@ pub(crate) enum DatabaseOperation {
         key: Vec<u8>,
         response_tx: std::sync::mpsc::Sender<io::Result<Option<InlineArray>>>,
     },
+    /// 检查键是否存在
+    ContainsKey {
+        key: Vec<u8>,
+        response_tx: std::sync::mpsc::Sender<io::Result<bool>>,
+    },
+    /// 清空所有数据
+    Clear {
+        response_tx: std::sync::mpsc::Sender<io::Result<()>>,
+    },
+    /// 获取键值对总数
+    Len {
+        response_tx: std::sync::mpsc::Sender<io::Result<usize>>,
+    },
+    /// 检查是否为空
+    IsEmpty {
+        response_tx: std::sync::mpsc::Sender<io::Result<bool>>,
+    },
+    /// 获取第一个键值对
+    First {
+        response_tx: std::sync::mpsc::Sender<io::Result<Option<(InlineArray, InlineArray)>>>,
+    },
+    /// 获取最后一个键值对
+    Last {
+        response_tx: std::sync::mpsc::Sender<io::Result<Option<(InlineArray, InlineArray)>>>,
+    },
 }
 
 /// 数据库操作Worker
@@ -171,6 +196,30 @@ impl DatabaseWorker {
                 let result = db.remove(&key);
                 let _ = response_tx.send(result);
             }
+            DatabaseOperation::ContainsKey { key, response_tx } => {
+                let result = db.contains_key(&key);
+                let _ = response_tx.send(result);
+            }
+            DatabaseOperation::Clear { response_tx } => {
+                let result = db.clear();
+                let _ = response_tx.send(result);
+            }
+            DatabaseOperation::Len { response_tx } => {
+                let result = db.len();
+                let _ = response_tx.send(result);
+            }
+            DatabaseOperation::IsEmpty { response_tx } => {
+                let result = db.is_empty();
+                let _ = response_tx.send(result);
+            }
+            DatabaseOperation::First { response_tx } => {
+                let result = db.first();
+                let _ = response_tx.send(result);
+            }
+            DatabaseOperation::Last { response_tx } => {
+                let result = db.last();
+                let _ = response_tx.send(result);
+            }
         }
     }
 
@@ -261,6 +310,97 @@ impl DatabaseWorker {
 
         let operation = DatabaseOperation::Remove {
             key,
+            response_tx,
+        };
+
+        self.operation_queue.push(operation);
+
+        response_rx.recv().unwrap_or_else(|_| {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "DatabaseWorker连接断开"))
+        })
+    }
+
+    /// 提交检查键是否存在操作
+    pub(crate) fn contains_key(&self, key: Vec<u8>) -> io::Result<bool> {
+        let (response_tx, response_rx) = std::sync::mpsc::channel();
+
+        let operation = DatabaseOperation::ContainsKey {
+            key,
+            response_tx,
+        };
+
+        self.operation_queue.push(operation);
+
+        response_rx.recv().unwrap_or_else(|_| {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "DatabaseWorker连接断开"))
+        })
+    }
+
+    /// 提交清空操作
+    pub(crate) fn clear(&self) -> io::Result<()> {
+        let (response_tx, response_rx) = std::sync::mpsc::channel();
+
+        let operation = DatabaseOperation::Clear {
+            response_tx,
+        };
+
+        self.operation_queue.push(operation);
+
+        response_rx.recv().unwrap_or_else(|_| {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "DatabaseWorker连接断开"))
+        })
+    }
+
+    /// 提交获取键值对总数操作
+    pub(crate) fn len(&self) -> io::Result<usize> {
+        let (response_tx, response_rx) = std::sync::mpsc::channel();
+
+        let operation = DatabaseOperation::Len {
+            response_tx,
+        };
+
+        self.operation_queue.push(operation);
+
+        response_rx.recv().unwrap_or_else(|_| {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "DatabaseWorker连接断开"))
+        })
+    }
+
+    /// 提交检查是否为空操作
+    pub(crate) fn is_empty(&self) -> io::Result<bool> {
+        let (response_tx, response_rx) = std::sync::mpsc::channel();
+
+        let operation = DatabaseOperation::IsEmpty {
+            response_tx,
+        };
+
+        self.operation_queue.push(operation);
+
+        response_rx.recv().unwrap_or_else(|_| {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "DatabaseWorker连接断开"))
+        })
+    }
+
+    /// 提交获取第一个键值对操作
+    pub(crate) fn first(&self) -> io::Result<Option<(InlineArray, InlineArray)>> {
+        let (response_tx, response_rx) = std::sync::mpsc::channel();
+
+        let operation = DatabaseOperation::First {
+            response_tx,
+        };
+
+        self.operation_queue.push(operation);
+
+        response_rx.recv().unwrap_or_else(|_| {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "DatabaseWorker连接断开"))
+        })
+    }
+
+    /// 提交获取最后一个键值对操作
+    pub(crate) fn last(&self) -> io::Result<Option<(InlineArray, InlineArray)>> {
+        let (response_tx, response_rx) = std::sync::mpsc::channel();
+
+        let operation = DatabaseOperation::Last {
             response_tx,
         };
 
