@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crossbeam_queue::SegQueue;
 use dashmap::DashMap;
@@ -143,7 +143,7 @@ impl AtomicWorker {
                 Self::handle_operation(&counters, operation, &db_queue);
             } else {
                 // 队列为空，短暂休眠避免CPU占用过高
-                thread::yield_now();
+                thread::sleep(Duration::from_millis(1));
             }
         }
     }

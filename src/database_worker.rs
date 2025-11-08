@@ -4,6 +4,7 @@
 
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 use std::io;
 
 use crossbeam_queue::SegQueue;
@@ -134,7 +135,7 @@ impl DatabaseWorker {
                 Self::handle_operation(&db, operation);
             } else {
                 // 队列为空，短暂休眠避免CPU占用过高
-                thread::yield_now();
+                thread::sleep(Duration::from_millis(1));
             }
         }
     }
