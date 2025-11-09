@@ -143,7 +143,7 @@ impl AtomicWorker {
                 Self::handle_operation(&counters, operation, &db_queue);
             } else {
                 // 队列为空，短暂休眠避免CPU占用过高
-                thread::sleep(Duration::from_millis(1));
+                thread::sleep(Duration::from_micros(500)); // 0.5ms休眠
             }
         }
     }
