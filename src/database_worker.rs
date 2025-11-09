@@ -118,6 +118,14 @@ impl DatabaseWorker {
         db: Arc<Db<1024>>,
         shutdown_rx: std::sync::mpsc::Receiver<()>,
     ) {
+        // 智能休眠参数
+        const BASE_SLEEP_US: u64 = 100;      // 基础休眠：100μs
+        const MAX_SLEEP_US: u64 = 5000;      // 最大休眠：5ms
+        const IDLE_THRESHOLD: u32 = 10;      // 空闲阈值：每10次空循环增加休眠
+
+        let mut idle_count = 0;               // 连续空闲次数
+        let mut current_sleep_us = BASE_SLEEP_US;
+
         loop {
             // 检查关闭信号
             match shutdown_rx.try_recv() {
@@ -133,9 +141,24 @@ impl DatabaseWorker {
             // 处理操作队列
             if let Some(operation) = operation_queue.pop() {
                 Self::handle_operation(&db, operation);
+                // 有操作时重置空闲计数和休眠时间
+                idle_count = 0;
+                current_sleep_us = BASE_SLEEP_US;
             } else {
-                // 队列为空，短暂休眠避免CPU占用过高
-                thread::sleep(Duration::from_micros(500)); // 0.5ms休眠
+                // 队列为空，智能自适应休眠
+                idle_count += 1;
+
+                // 动态调整休眠时间
+                if idle_count >= IDLE_THRESHOLD {
+                    let increase_factor = (idle_count / IDLE_THRESHOLD) as u64;
+                    current_sleep_us = std::cmp::min(
+                        BASE_SLEEP_US * (1 + increase_factor),
+                        MAX_SLEEP_US
+                    );
+                }
+
+                trace_log!("DatabaseWorker空闲{}次，休眠{}μs", idle_count, current_sleep_us);
+                thread::sleep(Duration::from_micros(current_sleep_us));
             }
         }
     }
