@@ -2,7 +2,7 @@
 //!
 //! 测试优化后的统一入口在高负载下的性能表现
 
-use melange_db::{Db, Config, atomic_operations_manager::AtomicOperationsManager};
+use melange_db::{Db, Config, hybrid_operations_manager::HybridOperationsManager};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -20,10 +20,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db: Db<1024> = config.open()?;
     let db = Arc::new(db);
 
-    // 创建统一路由器
-    let manager = Arc::new(AtomicOperationsManager::new(db.clone()));
+    // 创建混合管理器（启用DatabaseWorker模式以避免EBR冲突）
+    let mut manager = HybridOperationsManager::new(db.clone());
+    manager.enable_database_worker_mode();
+    let manager = Arc::new(manager);
 
-    println!("✅ 数据库和统一路由器初始化完成");
+    println!("✅ 数据库和混合管理器初始化完成");
     println!();
 
     // 测试1: 纯原子操作性能
@@ -51,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn test_atomic_operations(manager: &Arc<AtomicOperationsManager>, duration: Duration) -> Result<(), Box<dyn std::error::Error>> {
+fn test_atomic_operations(manager: &Arc<HybridOperationsManager>, duration: Duration) -> Result<(), Box<dyn std::error::Error>> {
     println!("运行{}秒纯原子操作测试...", duration.as_secs());
 
     let start_time = Instant::now();
@@ -85,7 +87,7 @@ fn test_atomic_operations(manager: &Arc<AtomicOperationsManager>, duration: Dura
     Ok(())
 }
 
-fn test_mixed_operations(manager: &Arc<AtomicOperationsManager>, duration: Duration) -> Result<(), Box<dyn std::error::Error>> {
+fn test_mixed_operations(manager: &Arc<HybridOperationsManager>, duration: Duration) -> Result<(), Box<dyn std::error::Error>> {
     println!("运行{}秒混合操作测试...", duration.as_secs());
 
     let start_time = Instant::now();
@@ -131,7 +133,7 @@ fn test_mixed_operations(manager: &Arc<AtomicOperationsManager>, duration: Durat
     Ok(())
 }
 
-fn test_concurrent_stress(manager: &Arc<AtomicOperationsManager>, duration: Duration) -> Result<(), Box<dyn std::error::Error>> {
+fn test_concurrent_stress(manager: &Arc<HybridOperationsManager>, duration: Duration) -> Result<(), Box<dyn std::error::Error>> {
     println!("运行{}秒高并发测试...", duration.as_secs());
 
     let manager_clone = manager.clone();

@@ -150,12 +150,12 @@ impl HybridOperationsManager {
     pub fn insert(&self, key: &[u8], value: &[u8]) -> io::Result<Option<InlineArray>> {
         trace_log!("直接数据库插入: {:?}", key);
 
-        // 检查是否需要通过DatabaseWorker（特殊场景）
+        // 使用DatabaseWorker以避免EBR冲突
         if let Some(db_worker) = &self.database_worker {
-            // 特殊场景：通过DatabaseWorker
+            // 启用DatabaseWorker模式时通过Worker避免EBR冲突
             db_worker.insert(key.to_vec(), value.to_vec())
         } else {
-            // 默认场景：直接访问，零开销
+            // 默认场景：直接访问，零开销（单线程安全）
             self.db.insert(key, value)
         }
     }
@@ -171,19 +171,24 @@ impl HybridOperationsManager {
         }
     }
 
-    /// 扫描前缀操作（直接访问）
+    /// 扫描前缀操作
     pub fn scan_prefix(&self, prefix: &[u8]) -> io::Result<Vec<(Vec<u8>, Vec<u8>)>> {
-        trace_log!("直接扫描前缀: {:?}", prefix);
+        trace_log!("扫描前缀: {:?}", prefix);
 
-        let result = self.db.scan_prefix(prefix)
-            .collect::<io::Result<Vec<_>>>()
-            .map(|items| {
-                items.into_iter()
-                    .map(|(key, value)| (key.to_vec(), value.to_vec()))
-                    .collect()
-            });
-
-        result
+        // 使用DatabaseWorker以避免EBR冲突
+        if let Some(db_worker) = &self.database_worker {
+            // 启用DatabaseWorker模式时通过Worker避免EBR冲突
+            db_worker.scan_prefix(prefix.to_vec())
+        } else {
+            // 默认场景：直接访问（单线程安全）
+            self.db.scan_prefix(prefix)
+                .collect::<io::Result<Vec<_>>>()
+                .map(|items| {
+                    items.into_iter()
+                        .map(|(key, value)| (key.to_vec(), value.to_vec()))
+                        .collect()
+                })
+        }
     }
 
     /// 执行数据库删除操作（直接访问）

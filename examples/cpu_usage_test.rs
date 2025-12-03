@@ -2,7 +2,7 @@
 //!
 //! 专门测试统一入口在长期运行下的CPU占用情况
 
-use melange_db::{Db, Config, atomic_operations_manager::AtomicOperationsManager};
+use melange_db::{Db, Config, hybrid_operations_manager::HybridOperationsManager};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let db = Arc::new(db);
 
     // 创建统一路由器
-    let manager = Arc::new(AtomicOperationsManager::new(db.clone()));
+    let manager = Arc::new(HybridOperationsManager::new(db.clone()));
 
     println!("✅ 数据库和统一路由器初始化完成");
     println!("📊 开始120秒三阶段CPU占用测试...");

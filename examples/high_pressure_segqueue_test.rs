@@ -1,4 +1,4 @@
-use melange_db::{Db, Config, platform_utils, atomic_operations_manager::AtomicOperationsManager};
+use melange_db::{Db, Config, platform_utils, hybrid_operations_manager::HybridOperationsManager};
 use std::sync::Arc;
 use std::thread;
 use std::io;
@@ -18,7 +18,7 @@ fn main() -> io::Result<()> {
     println!("\n📋 测试1: 创建统一路由器");
     println!("-----------------------");
 
-    let manager = AtomicOperationsManager::new(db.clone());
+    let manager = HybridOperationsManager::new(db.clone());
     let manager = Arc::new(manager);
     println!("  ✅ 统一路由器创建成功");
 
