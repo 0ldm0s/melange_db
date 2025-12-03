@@ -288,7 +288,7 @@ impl<const LEAF_FANOUT: usize> Leaf<LEAF_FANOUT> {
             zstd::stream::Encoder::new(&mut ret, zstd_compression_level)
                 .unwrap();
 
-        bincode::serialize_into(&mut zstd_enc, self).unwrap();
+        bincode::serde::encode_into_std_write(self, &mut zstd_enc, bincode::config::standard()).unwrap();
 
         zstd_enc.finish().unwrap();
 
@@ -309,7 +309,7 @@ impl<const LEAF_FANOUT: usize> Leaf<LEAF_FANOUT> {
                 .unwrap();
 
         // 序列化增量变更
-        bincode::serialize_into(&mut zstd_enc, changes).unwrap();
+        bincode::serde::encode_into_std_write(changes, &mut zstd_enc, bincode::config::standard()).unwrap();
 
         zstd_enc.finish().unwrap();
 
@@ -336,8 +336,8 @@ impl<const LEAF_FANOUT: usize> Leaf<LEAF_FANOUT> {
     /// 反序列化完整数据
     fn deserialize_full(buf: &[u8]) -> std::io::Result<Box<Leaf<LEAF_FANOUT>>> {
         let zstd_decoded = zstd::stream::decode_all(buf).unwrap();
-        let mut leaf: Box<Leaf<LEAF_FANOUT>> =
-            bincode::deserialize(&zstd_decoded).unwrap();
+        let (mut leaf, _): (Box<Leaf<LEAF_FANOUT>>, usize) =
+            bincode::serde::decode_from_slice(&zstd_decoded, bincode::config::standard()).unwrap();
 
         // 使用解压后的缓冲区长度作为内存大小的粗略估计
         leaf.in_memory_size = zstd_decoded.len();
@@ -348,7 +348,7 @@ impl<const LEAF_FANOUT: usize> Leaf<LEAF_FANOUT> {
     /// 反序列化增量数据
     fn deserialize_incremental(buf: &[u8]) -> std::io::Result<Box<Leaf<LEAF_FANOUT>>> {
         let zstd_decoded = zstd::stream::decode_all(&buf[1..]).unwrap();
-        let changes: IncrementalChanges = bincode::deserialize(&zstd_decoded).unwrap();
+        let (changes, _): (IncrementalChanges, usize) = bincode::serde::decode_from_slice(&zstd_decoded, bincode::config::standard()).unwrap();
         let base_version = changes.base_version;
         let current_version = changes.current_version;
 
