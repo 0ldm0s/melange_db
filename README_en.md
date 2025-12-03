@@ -88,46 +88,31 @@ AtomicOperationsManager (Pure Router)
 - ✅ **Zero EBR conflicts**: 12 threads running simultaneously completely safe
 - ✅ **100% data consistency**: All counters and record data completely accurate
 
-#### 🚀 Usage Example
+#### 🚀 Quick Start
 
-```rust
-use melange_db::{Db, Config, atomic_operations_manager::AtomicOperationsManager};
-use std::sync::Arc;
+Want to get started with Melange DB quickly? Check out the following latest example files:
 
-fn main() -> anyhow::Result<()> {
-    // Create database
-    let config = Config::new().path("my_db");
-    let db: Db<1024> = config.open()?;
+**Hybrid Manager Architecture (Recommended)**:
+- `cargo run --example hybrid_manager_guide` - Complete usage tutorial
+- `cargo run --example hybrid_best_practices` - Production environment best practices
 
-    // Create unified router
-    let manager = Arc::new(AtomicOperationsManager::new(Arc::new(db)));
+**Performance Testing**:
+- `cargo run --example high_pressure_segqueue_test` - High concurrency stress test
+- `cargo run --example performance_demo` - Basic performance demonstration
 
-    // Atomic operations (auto-persistence)
-    let user_id = manager.increment("user_counter".to_string(), 1)?;
-    println!("New user ID: {}", user_id);
-
-    // Database operations
-    manager.insert(b"user:profile", format!("user{}", user_id).as_bytes())?;
-
-    // Get counter
-    let counter = manager.get("user_counter".to_string())?;
-    println!("Total users: {:?}", counter);
-
-    Ok(())
-}
-```
+All example files contain detailed code comments and usage instructions to ensure you can quickly understand and use Melange DB.
 
 #### 🧪 Test Cases
 
 ```bash
-# Basic unified architecture test
-cargo run --example segqueue_unified_test
-
 # High-pressure concurrent test (12 threads)
 cargo run --example high_pressure_segqueue_test
 
-# Atomic operations Worker test
-cargo run --example atomic_worker_test
+# Hybrid Manager Best Practices
+cargo run --example hybrid_best_practices
+
+# Hybrid Manager Usage Guide
+cargo run --example hybrid_manager_guide
 ```
 
 #### 🔄 Migration Guide
@@ -162,38 +147,30 @@ let manager = Arc::new(AtomicOperationsManager::new(Arc::new(config.open()?)));
 
 ## Quick Start
 
-### Basic Usage
+### 📚 Learning Path
 
-```rust
-use melange_db::{Db, Config};
+**Recommended learning order for new users**:
 
-fn main() -> anyhow::Result<()> {
-    // Configure database
-    let config = Config::new()
-        .path("/path/to/database")
-        .cache_capacity_bytes(512 * 1024 * 1024); // 512MB cache
+1. **Getting Started Tutorial**: `cargo run --example hybrid_manager_guide`
+   - Learn basic usage of the hybrid manager
+   - Understand the unified interface for atomic operations and database operations
+   - Master data persistence and counter usage
 
-    // Open database
-    let db: Db<1024> = config.open()?;
+2. **Best Practices**: `cargo run --example hybrid_best_practices`
+   - Learn production environment best practices
+   - Master practical scenarios like user management and session handling
+   - Understand performance optimization and error handling
 
-    // Write data
-    let tree = db.open_tree("my_tree")?;
-    tree.insert(b"key", b"value")?;
+3. **Performance Testing**: `cargo run --example performance_demo`
+   - Learn about Melange DB's performance characteristics
+   - Understand cache configuration and flush strategies
+   - Master performance monitoring methods
 
-    // Read data
-    if let Some(value) = tree.get(b"key")? {
-        println!("Found value: {:?}", value);
-    }
+4. **Advanced Features**: `cargo run --example rat_logger_demo`
+   - Learn logging system integration
+   - Understand debugging and monitoring methods
 
-    // Range queries
-    for kv in tree.range(b"start"..b"end") {
-        let (key, value) = kv?;
-        println!("{}: {:?}", String::from_utf8_lossy(&key), value);
-    }
-
-    Ok(())
-}
-```
+All example files are complete, runnable programs with detailed English comments to help you quickly master Melange DB's various features.
 
 ### Compression Configuration
 
@@ -262,23 +239,60 @@ melange_db = "0.2.0"
 
 ## Examples
 
-Detailed usage examples can be found in the `examples/` directory:
+### 🔥 Available Example Overview
 
-### 🔥 Atomic Operations Unified Architecture (v0.2.0+)
-- **SegQueue Unified Architecture Test**: `cargo run --example segqueue_unified_test`
-  - Demonstrates the new atomic operations unified architecture
-  - Validates inter-worker communication and auto-persistence
-  - Includes basic routing functionality tests
+**Hybrid Manager Architecture (Recommended)**:
+- `cargo run --example hybrid_manager_guide` - Complete usage tutorial and API introduction
+- `cargo run --example hybrid_best_practices` - Production environment best practices
+- `cargo run --example high_pressure_segqueue_test` - 12-thread high concurrency stress test
 
-- **High-Pressure Concurrent Test**: `cargo run --example high_pressure_segqueue_test`
-  - 12-thread high-concurrency mixed operations test
-  - Validates system stability under high load
-  - Includes real-world scenarios like user systems, order systems
+**Performance Testing and Analysis**:
+- `cargo run --example performance_demo` - Basic performance demonstration
+- `cargo run --example accurate_timing_demo` - Precise timing analysis (P50/P95/P99)
+- `cargo run --example best_practices` - Traditional API best practices
 
-- **Atomic Operations Worker Test**: `cargo run --example atomic_worker_test`
-  - Pure atomic operations Worker performance test
-  - Validates atomic increment, get, and reset functionality
-  - Includes basic concurrent testing
+**System Integration**:
+- `cargo run --example rat_logger_demo` - Logging system integration
+- `cargo run --example no_logger_test` - No logger environment test
+
+**Platform Performance Testing**:
+- `cargo run --example macbook_air_m1_compression_none --features compression-none --release`
+- `cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release`
+- `cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release`
+
+### 📊 Performance and Functionality Testing
+- **Performance Benchmark Test**: `cargo run --example performance_demo`
+  - Basic performance demonstration and smart flush strategy showcase
+  - Includes read/write performance statistics and cache hit rate analysis
+
+- **Precise Timing Analysis**: `cargo run --example accurate_timing_demo`
+  - Detailed performance analysis with P50/P95/P99 statistics
+  - Shows latency distribution for different operation types
+
+- **Best Practices Demonstration**: `cargo run --example best_practices`
+  - Complete production environment usage example
+  - Includes user data management, session handling, transaction operations, etc.
+
+- **Logging System Integration**: `cargo run --example rat_logger_demo`
+  - Shows how to integrate rat_logger high-performance logging system
+  - Demonstrates log configuration and performance debug output
+
+- **No Logger Test**: `cargo run --example no_logger_test`
+  - Verifies safe behavior when logger is not initialized
+  - Shows library backward compatibility
+
+### 🖥️ Platform Performance Testing
+- **M1 MacBook Air Performance Test**:
+  ```bash
+  # No compression version (best performance)
+  cargo run --example macbook_air_m1_compression_none --features compression-none --release
+
+  # LZ4 compression version (balanced performance)
+  cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release
+
+  # Zstd compression version (high compression ratio)
+  cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release
+  ```
 
 ### ⚠️ Deprecated Examples (v0.1.4 and below)
 - `simple_atomic_sequence` - Migrated to new unified architecture
@@ -287,19 +301,16 @@ Detailed usage examples can be found in the `examples/` directory:
 
 ### 🔄 Migration Suggestions
 
-**If you are using old version examples**:
-
-❌ **Do not use** (has EBR conflicts):
+**It is recommended to use the latest hybrid manager architecture**:
 ```bash
-cargo run --example atomic_mixed_operations  # Will crash
-cargo run --example simple_atomic_test       # Has issues
-```
+# Learn basic usage
+cargo run --example hybrid_manager_guide
 
-✅ **Recommended use** (new unified architecture):
-```bash
-cargo run --example segqueue_unified_test
+# Production environment reference
+cargo run --example hybrid_best_practices
+
+# Performance stress testing
 cargo run --example high_pressure_segqueue_test
-cargo run --example atomic_worker_test
 ```
 
 ### 📊 Performance Testing Examples
@@ -352,21 +363,20 @@ fn main() -> anyhow::Result<()> {
 ### Running Examples
 
 ```bash
-# Run atomic operations unified architecture tests
-cargo run --example segqueue_unified_test
-cargo run --example high_pressure_segqueue_test
-cargo run --example atomic_worker_test
+# Hybrid Manager Architecture (Recommended)
+cargo run --example hybrid_manager_guide
+cargo run --example hybrid_best_practices
 
-# Run basic performance demo
+# Performance Testing
 cargo run --example performance_demo
-
-# Run precise timing analysis
 cargo run --example accurate_timing_demo
+cargo run --example high_pressure_segqueue_test
 
-# Run logging system integration example
+# System Integration
 cargo run --example rat_logger_demo
+cargo run --example no_logger_test
 
-# Run compression algorithm performance comparison
+# Platform Performance Testing
 cargo run --example macbook_air_m1_compression_none --features compression-none --release
 cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release
 cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release

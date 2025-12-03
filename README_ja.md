@@ -88,46 +88,31 @@ AtomicOperationsManager (純粋ルーター)
 - ✅ **ゼロEBR競合**: 12スレッド同時実行完全に安全
 - ✅ **100%データ一貫性**: すべてのカウンターとレコードデータ完全に正確
 
-#### 🚀 使用例
+#### 🚀 クイックスタート
 
-```rust
-use melange_db::{Db, Config, atomic_operations_manager::AtomicOperationsManager};
-use std::sync::Arc;
+Melange DBをすぐに始めたいですか？以下の最新のサンプルファイルを確認してください：
 
-fn main() -> anyhow::Result<()> {
-    // データベースを作成
-    let config = Config::new().path("my_db");
-    let db: Db<1024> = config.open()?;
+**ハイブリッドマネージャーアーキテクチャ（推奨）**：
+- `cargo run --example hybrid_manager_guide` - 完全な使用チュートリアル
+- `cargo run --example hybrid_best_practices` - 本番環境のベストプラクティス
 
-    // 統一ルーターを作成
-    let manager = Arc::new(AtomicOperationsManager::new(Arc::new(db)));
+**パフォーマンステスト**：
+- `cargo run --example high_pressure_segqueue_test` - 高並行ストレステスト
+- `cargo run --example performance_demo` - 基本パフォーマンスデモ
 
-    // 原子操作（自動永続化）
-    let user_id = manager.increment("user_counter".to_string(), 1)?;
-    println!("新しいユーザーID: {}", user_id);
-
-    // データベース操作
-    manager.insert(b"user:profile", format!("user{}", user_id).as_bytes())?;
-
-    // カウンターを取得
-    let counter = manager.get("user_counter".to_string())?;
-    println!("ユーザー総数: {:?}", counter);
-
-    Ok(())
-}
-```
+すべてのサンプルファイルには、Melange DBをすばやく理解して使用できるように、詳細なコードコメントと使用説明が含まれています。
 
 #### 🧪 テストケース
 
 ```bash
-# 基本統一アーキテクチャテスト
-cargo run --example segqueue_unified_test
-
 # 高圧力並行テスト（12スレッド）
 cargo run --example high_pressure_segqueue_test
 
-# 原子操作ワーカーテスト
-cargo run --example atomic_worker_test
+# ハイブリッドマネージャーベストプラクティス
+cargo run --example hybrid_best_practices
+
+# ハイブリッドマネージャー使用ガイド
+cargo run --example hybrid_manager_guide
 ```
 
 #### 🔄 移行ガイド
@@ -162,38 +147,30 @@ let manager = Arc::new(AtomicOperationsManager::new(Arc::new(config.open()?)));
 
 ## クイックスタート
 
-### 基本的な使用方法
+### 📚 学習パス
 
-```rust
-use melange_db::{Db, Config};
+**新規ユーザー推奨学習順序**：
 
-fn main() -> anyhow::Result<()> {
-    // データベースを設定
-    let config = Config::new()
-        .path("/path/to/database")
-        .cache_capacity_bytes(512 * 1024 * 1024); // 512MBキャッシュ
+1. **入門チュートリアル**: `cargo run --example hybrid_manager_guide`
+   - ハイブリッドマネージャーの基本的な使用方法を学習
+   - 原子操作とデータベース操作の統一インターフェースを理解
+   - データ永続化とカウンターの使用をマスター
 
-    // データベースを開く
-    let db: Db<1024> = config.open()?;
+2. **ベストプラクティス**: `cargo run --example hybrid_best_practices`
+   - 本番環境のベストプラクティスを学習
+   - ユーザー管理、セッション処理などの実践的なシナリオをマスター
+   - パフォーマンス最適化とエラーハンドリングを理解
 
-    // データを書き込む
-    let tree = db.open_tree("my_tree")?;
-    tree.insert(b"key", b"value")?;
+3. **パフォーマンステスト**: `cargo run --example performance_demo`
+   - Melange DBのパフォーマンス特性を理解
+   - キャッシュ設定とフラッシュ戦略を学習
+   - パフォーマンス監視方法をマスター
 
-    // データを読み込む
-    if let Some(value) = tree.get(b"key")? {
-        println!("Found value: {:?}", value);
-    }
+4. **高度な機能**: `cargo run --example rat_logger_demo`
+   - ログシステムの統合を学習
+   - デバッグと監視方法を理解
 
-    // 範囲クエリ
-    for kv in tree.range(b"start"..b"end") {
-        let (key, value) = kv?;
-        println!("{}: {:?}", String::from_utf8_lossy(&key), value);
-    }
-
-    Ok(())
-}
-```
+すべてのサンプルファイルは、Melange DBの様々な機能をすばやくマスターできるように、詳細な日本語コメントを含む完全に実行可能なプログラムです。
 
 ### 圧縮設定
 
@@ -262,23 +239,60 @@ melange_db = "0.2.0"
 
 ## サンプル
 
-詳細な使用例については`examples/`ディレクトリを参照してください：
+### 🔥 利用可能なサンプル概覧
 
-### 🔥 原子操作統一アーキテクチャ（v0.2.0+）
-- **SegQueue統一アーキテクチャテスト**: `cargo run --example segqueue_unified_test`
-  - 新しい原子操作統一アーキテクチャを実演
-  - ワーカー間通信と自動永続化を検証
-  - 基本ルーティング機能テストを含む
+**ハイブリッドマネージャーアーキテクチャ（推奨）**：
+- `cargo run --example hybrid_manager_guide` - 完全な使用チュートリアルとAPI紹介
+- `cargo run --example hybrid_best_practices` - 本番環境のベストプラクティス
+- `cargo run --example high_pressure_segqueue_test` - 12スレッド高並行ストレステスト
 
-- **高圧力並行テスト**: `cargo run --example high_pressure_segqueue_test`
-  - 12スレッド高並行混合操作テスト
-  - 高負荷下でのシステム安定性を検証
-  - ユーザーシステム、注文システムなどの実世界シナリオを含む
+**パフォーマンステストと分析**：
+- `cargo run --example performance_demo` - 基本パフォーマンスデモ
+- `cargo run --example accurate_timing_demo` - 精密なタイミング分析（P50/P95/P99）
+- `cargo run --example best_practices` - 従来APIのベストプラクティス
 
-- **原子操作ワーカーテスト**: `cargo run --example atomic_worker_test`
-  - 純粋原子操作ワーカーパフォーマンステスト
-  - 原子インクリメント、取得、リセット機能を検証
-  - 基本並行テストを含む
+**システム統合**：
+- `cargo run --example rat_logger_demo` - ログシステム統合
+- `cargo run --example no_logger_test` - ログなし環境テスト
+
+**プラットフォームパフォーマンステスト**：
+- `cargo run --example macbook_air_m1_compression_none --features compression-none --release`
+- `cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release`
+- `cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release`
+
+### 📊 パフォーマンスと機能テスト
+- **パフォーマンスベンチマークテスト**: `cargo run --example performance_demo`
+  - 基本パフォーマンスデモとスマートフラッシュ戦略のショーケース
+  - 読み書きパフォーマンス統計とキャッシュヒット率分析を含む
+
+- **精密なタイミング分析**: `cargo run --example accurate_timing_demo`
+  - P50/P95/P99統計を含む詳細なパフォーマンス分析
+  - 異なる操作タイプのレイテンシ分布を表示
+
+- **ベストプラクティスデモ**: `cargo run --example best_practices`
+  - 完全な本番環境使用例
+  - ユーザーデータ管理、セッション処理、トランザクション操作などを含む
+
+- **ログシステム統合**: `cargo run --example rat_logger_demo`
+  - rat_logger高パフォーマンスログシステムの統合方法を表示
+  - ログ設定とパフォーマンスデバッグ出力を実演
+
+- **ロガーなしテスト**: `cargo run --example no_logger_test`
+  - ロガーが初期化されていない場合の安全な動作を検証
+  - ライブラリの後方互換性を表示
+
+### 🖥️ プラットフォームパフォーマンステスト
+- **M1 MacBook Airパフォーマンステスト**：
+  ```bash
+  # 無圧縮バージョン（最高パフォーマンス）
+  cargo run --example macbook_air_m1_compression_none --features compression-none --release
+
+  # LZ4圧縮バージョン（バランス型パフォーマンス）
+  cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release
+
+  # Zstd圧縮バージョン（高圧縮率）
+  cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release
+  ```
 
 ### ⚠️ 非推奨サンプル（v0.1.4以下）
 - `simple_atomic_sequence` - 新統一アーキテクチャに移行済み
@@ -287,19 +301,16 @@ melange_db = "0.2.0"
 
 ### 🔄 移行提案
 
-**旧バージョンのサンプルを使用している場合**：
-
-❌ **使用しないでください**（EBR競合あり）：
+**最新のハイブリッドマネージャーアーキテクチャの使用を推奨**：
 ```bash
-cargo run --example atomic_mixed_operations  # クラッシュします
-cargo run --example simple_atomic_test       # 問題あり
-```
+# 基本使用方法を学習
+cargo run --example hybrid_manager_guide
 
-✅ **推奨使用**（新統一アーキテクチャ）：
-```bash
-cargo run --example segqueue_unified_test
+# 本番環境リファレンス
+cargo run --example hybrid_best_practices
+
+# パフォーマンスストレステスト
 cargo run --example high_pressure_segqueue_test
-cargo run --example atomic_worker_test
 ```
 
 ### 📊 パフォーマンステストサンプル
@@ -317,18 +328,20 @@ cargo run --example atomic_worker_test
 ### サンプルの実行
 
 ```bash
-# 原子操作統一アーキテクチャテストを実行
-cargo run --example segqueue_unified_test
-cargo run --example high_pressure_segqueue_test
-cargo run --example atomic_worker_test
+# ハイブリッドマネージャーアーキテクチャ（推奨）
+cargo run --example hybrid_manager_guide
+cargo run --example hybrid_best_practices
 
-# 基本的なパフォーマンスデモを実行
+# パフォーマンステスト
 cargo run --example performance_demo
-
-# 正確なタイミング分析を実行
 cargo run --example accurate_timing_demo
+cargo run --example high_pressure_segqueue_test
 
-# 圧縮アルゴリズムパフォーマンス比較を実行
+# システム統合
+cargo run --example rat_logger_demo
+cargo run --example no_logger_test
+
+# プラットフォームパフォーマンステスト
 cargo run --example macbook_air_m1_compression_none --features compression-none --release
 cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release
 cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release
