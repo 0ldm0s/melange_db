@@ -18,9 +18,11 @@ fn main() -> io::Result<()> {
     println!("\n📋 测试1: 创建统一路由器");
     println!("-----------------------");
 
-    let manager = HybridOperationsManager::new(db.clone());
+    // 创建混合管理器（启用DatabaseWorker模式以避免EBR冲突）
+    let mut manager = HybridOperationsManager::new(db.clone());
+    manager.enable_database_worker_mode();
     let manager = Arc::new(manager);
-    println!("  ✅ 统一路由器创建成功");
+    println!("  ✅ 统一路由器创建成功（已启用DatabaseWorker模式）");
 
     println!("\n📋 测试2: 12线程高压力并发测试");
     println!("-----------------------------");
@@ -280,7 +282,7 @@ fn main() -> io::Result<()> {
     thread::sleep(std::time::Duration::from_millis(200));
 
     // 创建新管理器验证持久化
-    let final_manager = AtomicOperationsManager::new(db.clone());
+    let final_manager = HybridOperationsManager::new(db.clone());
     let final_loaded = final_manager.preload_counters()?;
     println!("  最终预热计数器数量: {}", final_loaded);
 
