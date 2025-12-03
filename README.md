@@ -88,46 +88,31 @@ AtomicOperationsManager (纯路由器)
 - ✅ **零 EBR 冲突**: 12线程同时运行完全安全
 - ✅ **100%数据一致性**: 所有计数器和记录数据完全准确
 
-#### 🚀 使用示例
+#### 🚀 快速开始
 
-```rust
-use melange_db::{Db, Config, atomic_operations_manager::AtomicOperationsManager};
-use std::sync::Arc;
+想要快速上手 Melange DB？请查看以下最新的示例文件：
 
-fn main() -> anyhow::Result<()> {
-    // 创建数据库
-    let config = Config::new().path("my_db");
-    let db: Db<1024> = config.open()?;
+**混合管理器架构（推荐）**：
+- `cargo run --example hybrid_manager_guide` - 完整使用教程
+- `cargo run --example hybrid_best_practices` - 生产环境最佳实践
 
-    // 创建统一路由器
-    let manager = Arc::new(AtomicOperationsManager::new(Arc::new(db)));
+**性能测试**：
+- `cargo run --example high_pressure_segqueue_test` - 高并发压力测试
+- `cargo run --example performance_demo` - 基础性能演示
 
-    // 原子操作（自动持久化）
-    let user_id = manager.increment("user_counter".to_string(), 1)?;
-    println!("新用户ID: {}", user_id);
-
-    // 数据库操作
-    manager.insert(b"user:profile", format!("用户{}", user_id).as_bytes())?;
-
-    // 获取计数器
-    let counter = manager.get("user_counter".to_string())?;
-    println!("用户总数: {:?}", counter);
-
-    Ok(())
-}
-```
+所有示例文件都包含详细的代码注释和使用说明，确保您能够快速理解和使用 Melange DB。
 
 #### 🧪 测试用例
 
 ```bash
-# 基础统一架构测试
-cargo run --example segqueue_unified_test
-
 # 高压力并发测试 (12线程)
 cargo run --example high_pressure_segqueue_test
 
-# 原子操作Worker测试
-cargo run --example atomic_worker_test
+# 混合管理器最佳实践
+cargo run --example hybrid_best_practices
+
+# 混合管理器使用指南
+cargo run --example hybrid_manager_guide
 ```
 
 #### 🔄 迁移指南
@@ -162,83 +147,98 @@ let manager = Arc::new(AtomicOperationsManager::new(Arc::new(config.open()?)));
 
 ## 快速开始
 
-### 基本使用
+### 📚 学习路径
 
-```rust
-use melange_db::{Db, Config};
+**新用户推荐学习顺序**：
 
-fn main() -> anyhow::Result<()> {
-    // 配置数据库
-    let config = Config::new()
-        .path("/path/to/database")
-        .cache_capacity_bytes(512 * 1024 * 1024); // 512MB 缓存
+1. **入门教程**: `cargo run --example hybrid_manager_guide`
+   - 学习混合管理器的基本使用
+   - 了解原子操作和数据库操作的统一接口
+   - 掌握数据持久化和计数器使用
 
-    // 打开数据库
-    let db: Db<1024> = config.open()?;
+2. **最佳实践**: `cargo run --example hybrid_best_practices`
+   - 学习生产环境的最佳实践
+   - 掌握用户管理、会话处理等实际场景
+   - 了解性能优化和错误处理
 
-    // 写入数据
-    let tree = db.open_tree("my_tree")?;
-    tree.insert(b"key", b"value")?;
+3. **性能测试**: `cargo run --example performance_demo`
+   - 了解Melange DB的性能特性
+   - 学习缓存配置和flush策略
+   - 掌握性能监控方法
 
-    // 读取数据
-    if let Some(value) = tree.get(b"key")? {
-        println!("Found value: {:?}", value);
-    }
+4. **高级功能**: `cargo run --example rat_logger_demo`
+   - 学习日志系统集成
+   - 了解调试和监控方法
 
-    // 范围查询
-    for kv in tree.range(b"start"..b"end") {
-        let (key, value) = kv?;
-        println!("{}: {:?}", String::from_utf8_lossy(&key), value);
-    }
+所有示例文件都是完整可运行的程序，包含详细的中文注释，帮助您快速掌握 Melange DB 的各种功能。
 
-    Ok(())
-}
-```
+### 🔥 可用示例概览
 
-## 📚 示例代码
+**混合管理器架构（推荐）**：
+- `cargo run --example hybrid_manager_guide` - 完整使用教程和API介绍
+- `cargo run --example hybrid_best_practices` - 生产环境最佳实践
+- `cargo run --example high_pressure_segqueue_test` - 12线程高并发压力测试
 
-详细的使用示例请查看 `examples/` 目录：
+**性能测试和分析**：
+- `cargo run --example performance_demo` - 基础性能演示
+- `cargo run --example accurate_timing_demo` - 精确计时分析（P50/P95/P99）
+- `cargo run --example best_practices` - 传统API最佳实践
 
-### 🔥 原子操作统一架构 (v0.2.0+)
-- **SegQueue 统一架构测试**: `cargo run --example segqueue_unified_test`
-  - 展示新的原子操作统一架构
-  - 验证 Worker 间通信和自动持久化
-  - 包含基础路由功能测试
+**系统集成**：
+- `cargo run --example rat_logger_demo` - 日志系统集成
+- `cargo run --example no_logger_test` - 无日志环境测试
 
-- **高压力并发测试**: `cargo run --example high_pressure_segqueue_test`
-  - 12线程高并发混合操作测试
-  - 验证高负载下的系统稳定性
-  - 包含用户系统、订单系统等真实场景
+**平台性能测试**：
+- `cargo run --example macbook_air_m1_compression_none --features compression-none --release`
+- `cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release`
+- `cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release`
 
-- **原子操作Worker测试**: `cargo run --example atomic_worker_test`
-  - 纯原子操作Worker性能测试
-  - 验证原子递增、获取、重置功能
-  - 包含基础并发测试
-
-### 📊 性能基准测试
+### 📊 性能和功能测试
 - **性能基准测试**: `cargo run --example performance_demo`
-- **最佳实践**: `cargo run --example best_practices`
+  - 基本性能演示和智能flush策略展示
+  - 包含读写性能统计和缓存命中率分析
 
-### ⚠️ 已废弃示例 (v0.1.4 及以下)
-- `simple_atomic_sequence` - 已迁移到新的统一架构
-- `atomic_operations_test` - 存在EBR冲突问题，已废弃
-- `atomic_mixed_operations` - 存在并发限制，已废弃
+- **精确计时分析**: `cargo run --example accurate_timing_demo`
+  - 详细的性能分析，包含P50/P95/P99统计
+  - 展示不同操作类型的延迟分布
+
+- **最佳实践演示**: `cargo run --example best_practices`
+  - 完整的生产环境使用示例
+  - 包含用户数据管理、会话处理、事务操作等
+
+- **日志系统集成**: `cargo run --example rat_logger_demo`
+  - 展示如何集成rat_logger高性能日志系统
+  - 演示日志配置和性能调试输出
+
+- **无日志测试**: `cargo run --example no_logger_test`
+  - 验证未初始化日志时的安全行为
+  - 展示库的向后兼容性
+
+### 🖥️ 平台性能测试
+- **M1 MacBook Air性能测试**:
+  ```bash
+  # 无压缩版本（最佳性能）
+  cargo run --example macbook_air_m1_compression_none --features compression-none --release
+
+  # LZ4压缩版本（平衡性能）
+  cargo run --example macbook_air_m1_compression_lz4 --features compression-lz4 --release
+
+  # Zstd压缩版本（高压缩率）
+  cargo run --example macbook_air_m1_compression_zstd --features compression-zstd --release
+  ```
 
 ### 🔄 迁移建议
 
-**如果您正在使用旧版本的示例**:
-
-❌ **不要使用** (存在EBR冲突):
+**推荐使用最新的混合管理器架构**:
 ```bash
-cargo run --example atomic_mixed_operations  # 会崩溃
-cargo run --example simple_atomic_test       # 存在问题
-```
+# 学习基础使用
+cargo run --example hybrid_manager_guide
 
-✅ **推荐使用** (新统一架构):
-```bash
-cargo run --example segqueue_unified_test
+# 生产环境参考
+cargo run --example hybrid_best_practices
+
+# 性能压力测试
 cargo run --example high_pressure_segqueue_test
-cargo run --example atomic_worker_test
 ```
 
 ### 压缩配置
