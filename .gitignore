@@ -1,5 +1,8 @@
 /target
 
+# Cargo.lock 不需要提交
+Cargo.lock
+
 # 开发文档和计划
 sled_optimization_plan.md
 
